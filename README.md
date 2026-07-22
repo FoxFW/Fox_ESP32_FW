@@ -192,11 +192,46 @@ flashing.
 4. Click **Flash** — the installer downloads and writes the firmware automatically.
 5. Connect GPIO1/3 to your Flipper and open Fox ESP32 Commander.
 
-### Via Arduino IDE
+---
 
-1. Install the **ESP32 board package** via Boards Manager.
-2. Open `fox_esp32_firmware.ino`.
-3. Select your board from the **Tools → Board** menu.
-4. Upload at **115200 baud**.
+### Via Fox ESP32 Flasher (built into FoxFW)
+
+No PC required and no files to download — the firmware for every supported board is bundled directly into FoxFW and deployed to your SD card automatically during the standard qFlipper install.
+
+**Step 1 — Connect your ESP32**
+
+Connect your ESP32 to the Flipper Zero GPIO header:
+
+| ESP32 | Flipper GPIO |
+|---|---|
+| TX (GPIO1) | Pin 14 (RX) |
+| RX (GPIO3) | Pin 13 (TX) |
+| GND | GND |
+| 3.3V | 3.3V |
+
+**Step 2 — Open Fox ESP32 Flasher**
+
+On your Flipper go to **Apps → Fox → Fox ESP32 Flasher**. The app will attempt to detect a connected ESP32 automatically. If it is not detected, check your wiring and try again.
+
+**Step 3 — Select your board and flash**
+
+1. Select **Flash Firmware** from the main menu.
+2. Choose your board type from the list (e.g. ESP32 Classic, ESP32-S3, ESP32-C3, etc.).
+3. Confirm the firmware files shown and press **Flash**.
+4. Wait for the progress bar to complete — the app flashes the bootloader, partition table, and firmware in one pass.
+5. Press **Done** when finished. Your ESP32 resets automatically.
+
+Open **Fox ESP32 Commander** on your Flipper — it should detect the firmware and show the main menu.
+
+---
+
+### Via Arduino IDE *(Advanced)*
+
+Requires the Arduino IDE and ESP32 board package installed on your PC.
+
+1. Install the **ESP32 board package** via Boards Manager (`https://espressif.github.io/arduino-esp32/package_esp32_index.json`).
+2. Open `Fox_ESP32_FW.ino`.
+3. Select your board from **Tools → Board → ESP32 Arduino**.
+4. Connect your ESP32 via USB, select the correct COM port, and click **Upload**.
 
 ---
