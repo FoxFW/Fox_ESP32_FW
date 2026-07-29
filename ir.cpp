@@ -9,7 +9,6 @@
 #include <IRutils.h>
 
 namespace {
-
 IRsend irsend(IR_SEND_PIN);
 IRrecv irrecv(IR_RECV_PIN, IR_RECV_BUFFER_SIZE, IR_RECV_GAP_TIMEOUT_MS, true);
 bool irInitialized = false;
@@ -84,11 +83,9 @@ void doTvBGone() {
   }
   Serial.println("TVBGONEDONE");
 }
-
 }
 
 namespace FoxIr {
-
 bool handleCommand(const String& line) {
   if (line.startsWith("IRSEND:")) {
     String rest = line.substring(strlen("IRSEND:"));
@@ -118,13 +115,11 @@ bool handleCommand(const String& line) {
 
   return false;
 }
-
 }
 
 #else
 
 namespace FoxIr {
-
 bool handleCommand(const String& line) {
   static const char* prefixes[] = {
     "IRSEND:", "IRRECV", "IRTVBGONE"
@@ -137,7 +132,6 @@ bool handleCommand(const String& line) {
   }
   return false;
 }
-
 }
 
 #endif

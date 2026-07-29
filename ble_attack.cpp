@@ -14,7 +14,6 @@
 #endif
 
 namespace {
-
 void randomBytes(uint8_t* buf, size_t len) {
   for (size_t i = 0; i < len; i++) buf[i] = (uint8_t)random(0, 256);
 }
@@ -196,11 +195,9 @@ void runSpam(int mode) {
 }
 
 #endif
-
 }
 
 namespace FoxBleAttack {
-
 bool handleCommand(const String& line) {
   if (!line.startsWith("BLESPAM:")) return false;
 
@@ -233,13 +230,11 @@ bool scriptSpam(const String& modeArg) {
   if (mode == "FLIPPER") { runSpam(5); return true; }
   return false;
 }
-
 }
 
 #else
 
 namespace FoxBleAttack {
-
 bool handleCommand(const String& line) {
   if (!line.startsWith("BLESPAM:")) return false;
   Serial.println("ERROR:Incompatible ESP32-S2 Module has no BLE");
@@ -247,7 +242,6 @@ bool handleCommand(const String& line) {
 }
 
 bool scriptSpam(const String&) { return false; }
-
 }
 
 #endif

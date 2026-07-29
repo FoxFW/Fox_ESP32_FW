@@ -3,7 +3,6 @@
 #include <Arduino.h>
 
 namespace FoxSettings {
-
 void begin();
 
 bool attacksEnabled();
@@ -13,5 +12,4 @@ bool profanityFilterEnabled();
 void setProfanityFilterEnabled(bool enabled);
 
 bool handleSettingsCommand(const String& line);
-
 }

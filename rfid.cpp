@@ -7,7 +7,6 @@
 #include <Adafruit_PN532.h>
 
 namespace {
-
 Adafruit_PN532 nfc(PN532_IRQ_PIN, PN532_RESET_PIN);
 bool rfidInitialized = false;
 const uint8_t MIFARE_DEFAULT_KEY[6] = RFID_MIFARE_DEFAULT_KEY;
@@ -115,11 +114,9 @@ void doWrite(int block, const String& hexStr) {
   }
   Serial.println("OK");
 }
-
 }
 
 namespace FoxRfid {
-
 bool handleCommand(const String& line) {
   if (line == "RFIDINIT") {
     doInit();
@@ -158,20 +155,17 @@ bool handleCommand(const String& line) {
   }
 
   if (line.startsWith("RFIDEMULATE:")) {
-
     Serial.println("ERROR:NOTIMPLEMENTED");
     return true;
   }
 
   return false;
 }
-
 }
 
 #else
 
 namespace FoxRfid {
-
 bool handleCommand(const String& line) {
   static const char* prefixes[] = {
     "RFIDINIT", "RFIDSCAN", "RFIDREAD:", "RFIDWRITE:", "RFIDEMULATE:"
@@ -184,7 +178,6 @@ bool handleCommand(const String& line) {
   }
   return false;
 }
-
 }
 
 #endif

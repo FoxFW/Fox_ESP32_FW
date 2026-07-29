@@ -9,7 +9,6 @@
 #include <string.h>
 
 namespace {
-
 const uint8_t BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 const uint8_t SUPPORTED_RATES[8] = {0x82, 0x84, 0x8B, 0x96, 0x24, 0x30, 0x48, 0x6C};
 
@@ -364,11 +363,9 @@ int runPortScan(const String& ip, int startPort, int endPort) {
   Serial.println("PORTSCANDONE");
   return openCount;
 }
-
 }
 
 namespace FoxWifiAttack {
-
 bool handleCommand(const String& line) {
   if (line == "WIFIATTACK:DEAUTH") {
     if (refuseIfDisabled()) return true;
@@ -433,5 +430,4 @@ int scriptPortScan(const String& ip, int startPort, int endPort) {
   if (!FoxSettings::attacksEnabled()) return -1;
   return runPortScan(ip, startPort, endPort);
 }
-
 }

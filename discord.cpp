@@ -2,6 +2,7 @@
 #include "config.h"
 #include "settings.h"
 #include "profanity_filter.h"
+#include "tz.h"
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -10,7 +11,6 @@
 #include <string.h>
 
 namespace {
-
 Preferences discordPrefs;
 bool credsLoaded = false;
 String botToken;
@@ -100,6 +100,105 @@ int splitJsonObjects(const String& arr, String* out, int maxCount) {
   return count;
 }
 
+struct SimpleDT {
+  int year;
+  int mon;
+  int day;
+  int hour;
+  int min;
+};
+
+int daysInMonth(int year, int month) {
+  static const int dim[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (month == 2) {
+    bool leap = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+    return leap ? 29 : 28;
+  }
+  if (month < 1 || month > 12) return 30;
+  return dim[month - 1];
+}
+
+void applyOffset(SimpleDT* dt, int offsetMinutes) {
+  int total = dt->hour * 60 + dt->min + offsetMinutes;
+  int dayDelta = 0;
+  while (total < 0) {
+    total += 1440;
+    dayDelta--;
+  }
+  while (total >= 1440) {
+    total -= 1440;
+    dayDelta++;
+  }
+  dt->hour = total / 60;
+  dt->min = total % 60;
+  dt->day += dayDelta;
+  if (dt->day < 1) {
+    dt->mon--;
+    if (dt->mon < 1) {
+      dt->mon = 12;
+      dt->year--;
+    }
+    dt->day = daysInMonth(dt->year, dt->mon);
+  } else {
+    int dim = daysInMonth(dt->year, dt->mon);
+    if (dt->day > dim) {
+      dt->day = 1;
+      dt->mon++;
+      if (dt->mon > 12) {
+        dt->mon = 1;
+        dt->year++;
+      }
+    }
+  }
+}
+
+bool isAllDigits(const String& s, int start, int len) {
+  if (start < 0 || start + len > (int)s.length()) return false;
+  for (int k = 0; k < len; k++) {
+    if (!isDigit(s[start + k])) return false;
+  }
+  return true;
+}
+
+bool parseIsoDt(const String& ts, SimpleDT* out) {
+  if (ts.length() < 16) return false;
+  if (!isAllDigits(ts, 0, 4) || !isAllDigits(ts, 5, 2) || !isAllDigits(ts, 8, 2) ||
+      !isAllDigits(ts, 11, 2) || !isAllDigits(ts, 14, 2)) {
+    return false;
+  }
+  out->year = ts.substring(0, 4).toInt();
+  out->mon = ts.substring(5, 7).toInt();
+  out->day = ts.substring(8, 10).toInt();
+  out->hour = ts.substring(11, 13).toInt();
+  out->min = ts.substring(14, 16).toInt();
+  return true;
+}
+
+int monthFromAbbrev(const String& abbr) {
+  static const char* names[] = {
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  for (int k = 0; k < 12; k++) {
+    if (abbr.equalsIgnoreCase(names[k])) return k + 1;
+  }
+  return 0;
+}
+
+bool parseHttpDate(const String& d, SimpleDT* out) {
+  if (d.length() < 25) return false;
+  if (!isAllDigits(d, 5, 2) || !isAllDigits(d, 12, 4) || !isAllDigits(d, 17, 2) ||
+      !isAllDigits(d, 20, 2)) {
+    return false;
+  }
+  int mon = monthFromAbbrev(d.substring(8, 11));
+  if (mon == 0) return false;
+  out->day = d.substring(5, 7).toInt();
+  out->mon = mon;
+  out->year = d.substring(12, 16).toInt();
+  out->hour = d.substring(17, 19).toInt();
+  out->min = d.substring(20, 22).toInt();
+  return true;
+}
+
 unsigned long lastPostAttemptMs = 0;
 
 void doPost(const String& message) {
@@ -180,6 +279,8 @@ void doRead(int limit) {
     return;
   }
   http.addHeader("Authorization", "Bot " + botToken);
+  const char* headerKeys[] = {"Date"};
+  http.collectHeaders(headerKeys, 1);
   int code = http.GET();
   if (code != 200) {
     Serial.print("ERROR:HTTP:");
@@ -187,6 +288,7 @@ void doRead(int limit) {
     http.end();
     return;
   }
+  String dateHeader = http.header("Date");
   String body = http.getString();
   http.end();
 
@@ -197,6 +299,12 @@ void doRead(int limit) {
     return;
   }
 
+  int offsetMinutes = FoxTz::getOffsetMinutes();
+  bool tzKnown = FoxTz::hasOffset();
+  SimpleDT nowLocal;
+  bool haveNow = parseHttpDate(dateHeader, &nowLocal);
+  if (haveNow) applyOffset(&nowLocal, offsetMinutes);
+
   for (int i = count - 1; i >= 0; i--) {
     String content, timestamp;
     jsonExtractString(objects[i], "content", &content);
@@ -204,20 +312,35 @@ void doRead(int limit) {
     if ((int)content.length() > DISCORD_CONTENT_PREVIEW_MAX) {
       content = content.substring(0, DISCORD_CONTENT_PREVIEW_MAX) + "...";
     }
-    String hhmm = (timestamp.length() >= 16) ? timestamp.substring(11, 16) : String("--:--");
+
+    char timeField[16];
+    SimpleDT msgLocal;
+    if (parseIsoDt(timestamp, &msgLocal)) {
+      applyOffset(&msgLocal, offsetMinutes);
+      bool sameDay = haveNow && msgLocal.year == nowLocal.year && msgLocal.mon == nowLocal.mon &&
+                     msgLocal.day == nowLocal.day;
+      char tag = tzKnown ? 'L' : 'Z';
+      if (sameDay || !haveNow) {
+        snprintf(timeField, sizeof(timeField), "%c%02d:%02d", tag, msgLocal.hour, msgLocal.min);
+      } else {
+        snprintf(
+            timeField, sizeof(timeField), "%c%02d/%02d %02d:%02d", tag, msgLocal.day, msgLocal.mon,
+            msgLocal.hour, msgLocal.min);
+      }
+    } else {
+      snprintf(timeField, sizeof(timeField), "Z--:--");
+    }
 
     Serial.print("DISCORDMSG:");
-    Serial.print(hhmm);
+    Serial.print(timeField);
     Serial.print("|");
     Serial.println(content);
   }
   Serial.println("DISCORDREADDONE");
 }
-
 }
 
 namespace FoxDiscord {
-
 bool handleCommand(const String& line) {
   if (line.startsWith("DISCORDINIT:")) {
     String rest = line.substring(strlen("DISCORDINIT:"));
@@ -254,5 +377,4 @@ bool handleCommand(const String& line) {
 
   return false;
 }
-
 }

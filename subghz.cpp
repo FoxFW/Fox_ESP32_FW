@@ -6,7 +6,6 @@
 #include <ELECHOUSE_CC1101_SRC_DRV.h>
 
 namespace {
-
 bool subghzInitialized = false;
 
 bool hexCharToNibble(char c, uint8_t* out) {
@@ -90,11 +89,9 @@ void doTx(const String& hexStr) {
   ELECHOUSE_cc1101.SetRx();
   Serial.println("OK");
 }
-
 }
 
 namespace FoxSubGhz {
-
 bool handleCommand(const String& line) {
   if (line == "SUBGHZINIT") {
     doInit();
@@ -126,13 +123,11 @@ bool handleCommand(const String& line) {
 
   return false;
 }
-
 }
 
 #else
 
 namespace FoxSubGhz {
-
 bool handleCommand(const String& line) {
   static const char* prefixes[] = {
     "SUBGHZINIT", "SUBGHZFREQ:", "SUBGHZRX", "SUBGHZTX:"
@@ -145,7 +140,6 @@ bool handleCommand(const String& line) {
   }
   return false;
 }
-
 }
 
 #endif

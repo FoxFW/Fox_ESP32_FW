@@ -13,7 +13,6 @@
 #endif
 
 namespace {
-
 BLEClient* bleClient = nullptr;
 bool bleInitialized = false;
 BLERemoteService* remoteService = nullptr;
@@ -80,11 +79,9 @@ void notifyCallback(BLERemoteCharacteristic* characteristic, uint8_t* data, size
   printHex(data, length);
   Serial.println();
 }
-
 }
 
 namespace FoxBle {
-
 bool isConnected() {
   return bleClient != nullptr && bleClient->isConnected();
 }
@@ -93,7 +90,6 @@ bool ensureInitialized() {
   if (!bleInitialized) {
     bleInitialized = BLEDevice::init("FoxESP32");
     if (bleInitialized) {
-
 #if FOX_BLE_NIMBLE
       BLEDevice::setPower(ESP_PWR_LVL_P9, ESP_BLE_PWR_TYPE_DEFAULT);
       BLEDevice::setPower(ESP_PWR_LVL_P9, ESP_BLE_PWR_TYPE_ADV);
@@ -132,7 +128,6 @@ void scriptScan() {
 
 bool handleCommand(const String& line) {
   if (line == "BLEINIT") {
-
     ensureInitialized();
     Serial.println(bleInitialized ? "OK" : "ERROR");
     return true;
@@ -271,13 +266,11 @@ bool handleCommand(const String& line) {
 
   return false;
 }
-
 }
 
 #else
 
 namespace FoxBle {
-
 bool isConnected() { return false; }
 bool ensureInitialized() { return false; }
 bool writeHex(const String&) { return false; }
@@ -295,7 +288,6 @@ bool handleCommand(const String& line) {
   }
   return false;
 }
-
 }
 
 #endif

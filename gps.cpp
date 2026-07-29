@@ -6,7 +6,6 @@
 #include <HardwareSerial.h>
 
 namespace {
-
 HardwareSerial gpsSerial(2);
 
 char nmeaBuf[GPS_NMEA_LINE_MAX];
@@ -70,7 +69,6 @@ bool checksumOk(const String& sentence) {
 }
 
 void parseRMC(const String& body) {
-
   String f[12];
   if (splitFields(body, f, 12) < 10) return;
   lastTime = f[1];
@@ -85,7 +83,6 @@ void parseRMC(const String& body) {
 }
 
 void parseGGA(const String& body) {
-
   String f[15];
   if (splitFields(body, f, 15) < 10) return;
   int fixQuality = f[6].toInt();
@@ -135,11 +132,9 @@ void doInit() {
   nmeaLen = 0;
   Serial.println("OK");
 }
-
 }
 
 namespace FoxGps {
-
 void loop() {
   if (gpsInitialized) pump();
 }
@@ -268,13 +263,11 @@ bool handleCommand(const String& line) {
 
   return false;
 }
-
 }
 
 #else
 
 namespace FoxGps {
-
 void loop() {}
 
 bool getFix(double* latOut, double* lonOut) {
@@ -296,7 +289,6 @@ bool handleCommand(const String& line) {
   }
   return false;
 }
-
 }
 
 #endif

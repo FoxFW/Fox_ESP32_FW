@@ -11,7 +11,6 @@
 #include <string.h>
 
 namespace {
-
 struct ApEntry {
   String ssid;
   uint8_t bssid[6];
@@ -501,11 +500,9 @@ void runMacTrack() {
   }
   Serial.print("MACTRACKDONE:"); Serial.println(macTrackCount);
 }
-
 }
 
 namespace FoxWifiRecon {
-
 void begin() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
@@ -649,5 +646,4 @@ bool handleCommand(const String& line) {
 
   return false;
 }
-
 }

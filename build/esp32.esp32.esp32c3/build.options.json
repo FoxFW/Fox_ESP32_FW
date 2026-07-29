@@ -1,10 +1,10 @@
 {
-  "additionalFiles": "..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..\\..,..\\..,..\\..,..\\..,..\\..",
+  "additionalFiles": "..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..",
   "builtInLibrariesFolders": "C:\\Users\\PC\\AppData\\Local\\Arduino15\\libraries",
   "compiler.optimization_flags": "-Os",
   "customBuildProperties": "",
   "fqbn": "esp32:esp32:esp32c3:UploadSpeed=921600,CDCOnBoot=default,CPUFreq=160,FlashFreq=80,FlashMode=qio,FlashSize=4M,PartitionScheme=huge_app,DebugLevel=none,EraseFlash=none,JTAGAdapter=default,ZigbeeMode=default",
-  "hardwareFolders": "C:\\Users\\PC\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.10,C:\\Users\\PC\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.10",
+  "hardwareFolders": "C:\\Users\\PC\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.11,C:\\Users\\PC\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.11",
   "otherLibrariesFolders": "c:\\Users\\PC\\Documents\\Arduino\\libraries",
-  "sketchLocation": "C:\\Users\\PC\\Desktop\\fox_esp32_firmware"
+  "sketchLocation": "C:\\Fox_ESP32_FW"
 }

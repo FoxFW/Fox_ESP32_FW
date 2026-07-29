@@ -11,7 +11,6 @@
 #include <BLEAdvertising.h>
 
 namespace {
-
 enum class TagType { FINDMY, SMARTTAG, TILE, FLOCK, META };
 
 const char* tagTypeLabel(TagType t) {
@@ -143,7 +142,6 @@ bool runSpoofAirTag() {
 
   unsigned long start = millis();
   while (millis() - start < (unsigned long)BLESPAM_BURST_SECONDS * 1000UL) {
-
     uint8_t payload[30];
     uint8_t inner[27];
     inner[0] = 0x12;
@@ -206,11 +204,9 @@ bool runTagScan(TagType type) {
   Serial.println(cb->foundCount);
   return true;
 }
-
 }
 
 namespace FoxBleTags {
-
 bool handleCommand(const String& line) {
   if (line.startsWith("BLETAGSCAN:")) {
     String modeStr = line.substring(11);
@@ -245,13 +241,11 @@ bool handleCommand(const String& line) {
 
   return false;
 }
-
 }
 
 #else
 
 namespace FoxBleTags {
-
 bool handleCommand(const String& line) {
   if (line.startsWith("BLETAGSCAN:") || line == "SPOOFAT") {
     Serial.println("ERROR:Incompatible ESP32-S2 Module has no BLE");
@@ -259,7 +253,6 @@ bool handleCommand(const String& line) {
   }
   return false;
 }
-
 }
 
 #endif

@@ -17,6 +17,7 @@
 SET_LOOP_TASK_STACK_SIZE(32 * 1024);
 
 void setup() {
+  Serial.setRxBufferSize(LINE_BUFFER_MAX + 256);
   Serial.begin(SERIAL_BAUD);
   delay(200);
   Serial.println();

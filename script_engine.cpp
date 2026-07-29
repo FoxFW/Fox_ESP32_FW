@@ -16,7 +16,6 @@
 #include <string.h>
 
 namespace {
-
 enum class VT { UNDEF, NUM, STR, BOOL, ARRAY, OBJECT };
 
 struct Value {
@@ -493,7 +492,6 @@ public:
   }
 
   Value callNative(const String& name, Value* args, int argc, bool exec) {
-
     if (name == "print") {
       if (exec) {
         for (int i = 0; i < argc; i++) {
@@ -884,7 +882,6 @@ public:
       expectPunct("(");
       int condStart = pos;
       if (!exec) {
-
         parseOr(false);
         expectPunct(")");
         execBlock(false);
@@ -917,14 +914,12 @@ public:
       int closePos = scanToCloseParen(incrStart);
       int bodyPos = closePos + 1;
       if (!exec) {
-
         pos = bodyPos;
         execBlock(false);
         return;
       }
       int iters = 0;
       while (!error && !returning) {
-
         pos = condStart;
         Value cond = parseOr(true);
 
@@ -1016,7 +1011,6 @@ public:
       String name = cur().text; pos++;
 
       if (!isEnd() && cur().type == TT::PUNCT && cur().text == "[") {
-
         int closeBracket = pos + 1;
         int depth = 1;
         while (closeBracket < count && depth > 0) {
@@ -1144,6 +1138,7 @@ void cmdShow(const String& rawName) {
   File f = LittleFS.open(path, "r");
   if (!f) { Serial.println("ERROR:NOTFOUND"); return; }
   Serial.println(f.readString());
+  Serial.println("SCRIPTSHOWDONE");
   f.close();
 }
 
@@ -1175,11 +1170,9 @@ void cmdRun(const String& rawName) {
   }
   Serial.println("SCRIPTDONE");
 }
-
 }
 
 namespace FoxScript {
-
 void begin() {
   LittleFS.begin(true);
 }
@@ -1192,5 +1185,4 @@ bool handleCommand(const String& line) {
   if (line.startsWith("SCRIPTRUN:")) { cmdRun(line.substring(10)); return true; }
   return false;
 }
-
 }

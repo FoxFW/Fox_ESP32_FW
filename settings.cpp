@@ -9,7 +9,6 @@ namespace {
 }
 
 namespace FoxSettings {
-
 void begin() {
   prefs.begin("foxsettings", false);
 
@@ -30,7 +29,6 @@ void setAttacksEnabled(bool enabled) {
 }
 
 bool profanityFilterEnabled() {
-
   return !started || cachedProfanityFilterEnabled;
 }
 
@@ -96,5 +94,4 @@ bool handleSettingsCommand(const String& line) {
 
   return false;
 }
-
 }

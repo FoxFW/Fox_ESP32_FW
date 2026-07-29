@@ -5,17 +5,14 @@
 #include <ctype.h>
 
 namespace {
-
 constexpr size_t kWordBufMax = 64;
 
 bool isWordChar(char c) {
   return isalnum((unsigned char)c) != 0;
 }
-
 }
 
 namespace FoxProfanityFilter {
-
 bool containsBlockedContent(const String& textIn) {
   String text = textIn;
   text.toLowerCase();
@@ -51,5 +48,4 @@ bool containsBlockedContent(const String& textIn) {
   }
   return false;
 }
-
 }
