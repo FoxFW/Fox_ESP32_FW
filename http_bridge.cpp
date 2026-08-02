@@ -847,6 +847,10 @@ int dlBytesRead = 0;
 void dlCleanup() {
   if (dlActive) {
     dlHttp.end();
+
+    dlSecureClient.stop();
+    dlPlainClient.stop();
+    delay(150);
   }
   dlActive = false;
   dlTotalSize = -1;
@@ -865,6 +869,12 @@ void handleDownloadStart(const String& json) {
   }
   dlCleanup();
 
+  String offsetStr;
+  long rangeOffset = 0;
+  if (jsonExtractString(json, "offset", &offsetStr)) {
+    rangeOffset = offsetStr.toInt();
+  }
+
   dlHttp.setTimeout(HTTP_TIMEOUT_MS);
   dlHttp.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
@@ -878,6 +888,10 @@ void handleDownloadStart(const String& json) {
   if (!began) {
     Serial.println("[ERROR] invalid url");
     return;
+  }
+
+  if (rangeOffset > 0) {
+    dlHttp.addHeader("Range", "bytes=" + String(rangeOffset) + "-");
   }
 
   int code = dlHttp.GET();
@@ -897,13 +911,6 @@ void handleDownloadStart(const String& json) {
   Serial.println("}");
 }
 
-// Modeled directly on FlipperHTTP's HTTP::stream() (jblanked/FlipperHTTP,
-// src/flipper-http/http.cpp): push raw bytes straight to Serial with no
-// per-chunk framing, no ACKs, no baud switching. An idle-stall timeout on
-// the HTTP stream is the only thing that can end the loop early. The
-// receiver already knows the exact expected size (from
-// DOWNLOAD/START/SUCCESS) so it reads exactly that many raw bytes back -
-// no end-of-stream marker needs to survive being embedded in binary data.
 void handleDownloadStream() {
   if (!dlActive) {
     Serial.println("[ERROR] no active download");
@@ -1021,6 +1028,7 @@ bool githubGetJson(const String& url, String* outBody, int* outCode) {
 }
 
 bool githubGetJsonHead(const String& url, String* outBody, int* outCode) {
+  *outCode = 0;
   HTTPClient http;
   WiFiClientSecure secureClient;
   secureClient.setInsecure();
@@ -1191,10 +1199,15 @@ void handleReleaseCheck(const String& json) {
   bool needAssets = json.indexOf("\"needAssets\":false") < 0;
 
   String body;
-  int code;
+  int code = 0;
   String url = "https://api.github.com/repos/" + repo + "/releases/latest";
   if (!githubGetJsonHead(url, &body, &code)) {
-    Serial.println("[ERROR] release lookup failed");
+    Serial.print("[ERROR] release lookup failed, code=");
+    Serial.print(code);
+    Serial.print(", heap=");
+    Serial.print(ESP.getFreeHeap());
+    Serial.print("/");
+    Serial.println(ESP.getMaxAllocHeap());
     return;
   }
   if (code == 404) {

@@ -504,6 +504,7 @@ void runMacTrack() {
 
 namespace FoxWifiRecon {
 void begin() {
+  WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   WiFi.setSleep(false);

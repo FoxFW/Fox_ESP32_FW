@@ -441,12 +441,16 @@ void startPortal(const String& ssid, const String& date) {
   dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
   dnsServer.start(53, "*", apIP);
   webServer.onNotFound(handleRedirect);
-  webServer.on("/", HTTP_GET, handleServe);
-  webServer.on("/", HTTP_POST, handleSubmit);
-  webServer.on("/generate_204", HTTP_GET, handleServe);
-  webServer.on("/generate_204/", HTTP_GET, handleServe);
-  webServer.on("/gen_204", HTTP_GET, handleServe);
-  webServer.on("/gen_204/", HTTP_GET, handleServe);
+  static bool routesRegistered = false;
+  if (!routesRegistered) {
+    webServer.on("/", HTTP_GET, handleServe);
+    webServer.on("/", HTTP_POST, handleSubmit);
+    webServer.on("/generate_204", HTTP_GET, handleServe);
+    webServer.on("/generate_204/", HTTP_GET, handleServe);
+    webServer.on("/gen_204", HTTP_GET, handleServe);
+    webServer.on("/gen_204/", HTTP_GET, handleServe);
+    routesRegistered = true;
+  }
   webServer.begin();
   sentinelProbeServer.begin();
 
@@ -462,6 +466,11 @@ void startPortal(const String& ssid, const String& date) {
 }
 
 void stopPortal() {
+  if (!portalActive) {
+    Serial.println("FOXPORTAL:STOPPED");
+    return;
+  }
+
   int clientsBefore = WiFi.softAPgetStationNum();
 
   if (clientsBefore > 0) {
@@ -475,12 +484,18 @@ void stopPortal() {
   sentinelProbeServer.stop();
   dnsServer.stop();
   WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_STA);
+  startHtml = "";
+  thanksHtml = "";
   portalActive = false;
 
   if (clientsBefore > 0) {
     Serial.println("FOXPORTAL:USERSKICKED");
   }
   Serial.println("FOXPORTAL:STOPPED");
+  Serial.flush();
+  delay(50);
+  ESP.restart();
 }
 
 }
