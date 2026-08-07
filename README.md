@@ -2,7 +2,9 @@
   <h1>Fox ESP32 Firmware</h1>
   <p><em>ESP32 companion firmware for the Fox Flipper Zero apps.</em></p>
   <p>
-    <a href="https://foxfw.github.io/2.0/fox-esp32-flasher.html">Flash via Browser</a>
+    <a href="https://foxfw.github.io/fox-web/fox-esp32-flasher.html">Flash via Browser</a>
+    &nbsp;·&nbsp;
+    <a href="https://foxfw.github.io/fox-web/fap-compiler.html">FAP Compiler</a>
     &nbsp;·&nbsp;
     <a href="mailto:foxcustomfirmware@gmail.com">Email Support</a>
   </p>
@@ -204,7 +206,7 @@ flashing.
 
 ### Via Web Flasher (recommended)
 
-**[→ Flash Fox ESP32 Firmware](https://foxfw.github.io/2.0/fox-esp32-flasher.html)** `Recommended`
+**[→ Flash Fox ESP32 Firmware](https://foxfw.github.io/fox-web/fox-esp32-flasher.html)** `Recommended`
 
 1. Open the link above in **Chrome** or **Edge** on desktop.
 2. Connect your ESP32 via USB.
@@ -253,5 +255,15 @@ Requires the Arduino IDE and ESP32 board package installed on your PC.
 2. Open `Fox_ESP32_FW.ino`.
 3. Select your board from **Tools → Board → ESP32 Arduino**.
 4. Connect your ESP32 via USB, select the correct COM port, and click **Upload**.
+
+---
+
+## Running Third-Party Flipper Apps
+
+Everything on this board is controlled by Flipper apps under `Apps → Fox`.
+Want to run a Flipper app that isn't part of the Fox suite? The
+**[FAP Compiler](https://foxfw.github.io/fox-web/fap-compiler.html)** builds
+a `.fap` against FoxFW v2.0 straight from a GitHub URL — no local toolchain
+install needed.
 
 ---
