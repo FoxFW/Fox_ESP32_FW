@@ -5,6 +5,7 @@ namespace {
   Preferences prefs;
   bool cachedAttacksEnabled = false;
   bool cachedProfanityFilterEnabled = true;
+  bool cachedExpertModeEnabled = false;
   bool started = false;
 }
 
@@ -14,6 +15,7 @@ void begin() {
 
   cachedAttacksEnabled = prefs.getBool("attacks", false);
   cachedProfanityFilterEnabled = prefs.getBool("profanity", true);
+  cachedExpertModeEnabled = prefs.getBool("expertmode", false);
   started = true;
 }
 
@@ -39,12 +41,25 @@ void setProfanityFilterEnabled(bool enabled) {
   }
 }
 
+bool expertModeEnabled() {
+  return started && cachedExpertModeEnabled;
+}
+
+void setExpertModeEnabled(bool enabled) {
+  cachedExpertModeEnabled = enabled;
+  if (started) {
+    prefs.putBool("expertmode", enabled);
+  }
+}
+
 bool handleSettingsCommand(const String& line) {
   if (line == "SETTINGS") {
     Serial.print("ATTACKS:");
     Serial.println(attacksEnabled() ? "ON" : "OFF");
     Serial.print("PROFANITY:");
     Serial.println(profanityFilterEnabled() ? "ON" : "OFF");
+    Serial.print("EXPERTMODE:");
+    Serial.println(expertModeEnabled() ? "ON" : "OFF");
     return true;
   }
 
@@ -81,6 +96,19 @@ bool handleSettingsCommand(const String& line) {
         Serial.println("OK");
       } else if (value == "OFF") {
         setProfanityFilterEnabled(false);
+        Serial.println("OK");
+      } else {
+        Serial.println("ERROR");
+      }
+      return true;
+    }
+
+    if (key == "EXPERTMODE") {
+      if (value == "ON") {
+        setExpertModeEnabled(true);
+        Serial.println("OK");
+      } else if (value == "OFF") {
+        setExpertModeEnabled(false);
         Serial.println("OK");
       } else {
         Serial.println("ERROR");

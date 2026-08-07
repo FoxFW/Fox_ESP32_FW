@@ -17,9 +17,9 @@
 Fox ESP32 Firmware turns a wired ESP32 into an extension of your Flipper Zero,
 controlled entirely over UART at 115200 baud using a compact AT bracket-command
 protocol. Once flashed, the ESP32 responds to commands from the Fox Flipper apps
-— **Fox ESP32 Commander**, **Fox Chat**, **Fox Portal**, **Fox Chameleon**, and
-**Fox Update Downloader** — expanding what the Flipper can do with WiFi,
-Bluetooth, HTTP, and scripting.
+— **Fox ESP32 Commander**, **Fox Chat**, **Fox Portal**, **Fox Chameleon**,
+**Fox Update Downloader**, and **Fox File Downloader** — expanding what the
+Flipper can do with WiFi, Bluetooth, HTTP, and scripting.
 
 ---
 
@@ -35,6 +35,7 @@ the main [FoxFW2.0](https://github.com/FoxFW/2.0) repository, all under
 | **Fox ESP32 Detector** | Scans every GPIO pin pair and baud rate to confirm your wiring and identify this firmware |
 | **Fox ESP32 Flasher** | Flashes this firmware onto a connected board directly from the Flipper — no PC required |
 | **Fox Update Downloader** | Checks GitHub for newer releases of this firmware (and FoxFW itself), downloads them over this same UART bridge, and hands off to install |
+| **Fox File Downloader** | Direct URL downloads with resume, an App Catalog browser, a GitHub `.fap` installer, and its own app-manager and WiFi/recon/attack menus |
 | **Fox ESP32 Terminal** | A focused live-terminal companion with per-session logs saved to the SD card |
 | **Fox Chat** | Posts to and reads from a Discord channel through this firmware's internet connection |
 | **Fox Portal** | Turns the board into a captive-portal access point with a configurable enquiry-form landing page |

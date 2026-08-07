@@ -28,7 +28,7 @@
 // to keep recon/attack range from taking too much of a hit.
 #define FOX_WIFI_TX_POWER WIFI_POWER_15dBm
 
-#define FOX_FIRMWARE_VERSION "1.2.0"
+#define FOX_FIRMWARE_VERSION "1.2.1"
 
 #define BLE_SCAN_SECONDS 5
 
