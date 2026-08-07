@@ -37,6 +37,24 @@ bool parseWsUrl(const String& url, bool* isSecure, String* host, uint16_t* port,
   return host->length() > 0;
 }
 
+String resolveRedirectLocation(const String& baseUrl, const String& location) {
+  if (location.startsWith("http://") || location.startsWith("https://")) {
+    return location;
+  }
+  String scheme = baseUrl.startsWith("https://") ? "https:" : "http:";
+  if (location.startsWith("//")) {
+    return scheme + location;
+  }
+  int schemeEnd = baseUrl.indexOf("://");
+  int hostStart = (schemeEnd < 0) ? 0 : schemeEnd + 3;
+  int hostEnd = baseUrl.indexOf('/', hostStart);
+  String origin = (hostEnd < 0) ? baseUrl : baseUrl.substring(0, hostEnd);
+  if (location.startsWith("/")) {
+    return origin + location;
+  }
+  return origin + "/" + location;
+}
+
 void wsEventHandler(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
@@ -287,6 +305,7 @@ void handleWifiConnect(const String& json) {
         Serial.print("[WIFI/CONNECT/SUCCESS]");
         Serial.println(s);
         Serial.println("[SUCCESS] Connected to Wifi.");
+        delay(1000);
         FoxTz::refreshOffset();
         return;
       }
@@ -311,6 +330,7 @@ void handleWifiConnect(const String& json) {
     Serial.print("[WIFI/CONNECT/SUCCESS]");
     Serial.println(ssid);
     Serial.println("[SUCCESS] Connected to Wifi.");
+    delay(1000);
     FoxTz::refreshOffset();
   } else {
     Serial.print("[ERROR] failed to connect (status=");
@@ -845,11 +865,10 @@ int dlTotalSize = -1;
 int dlBytesRead = 0;
 
 void dlCleanup() {
+  dlHttp.end();
+  dlSecureClient.stop();
+  dlPlainClient.stop();
   if (dlActive) {
-    dlHttp.end();
-
-    dlSecureClient.stop();
-    dlPlainClient.stop();
     delay(150);
   }
   dlActive = false;
@@ -875,27 +894,46 @@ void handleDownloadStart(const String& json) {
     rangeOffset = offsetStr.toInt();
   }
 
-  dlHttp.setTimeout(HTTP_TIMEOUT_MS);
   dlHttp.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
-  bool began;
-  if (url.startsWith("https://")) {
-    dlSecureClient.setInsecure();
-    began = dlHttp.begin(dlSecureClient, url);
-  } else {
-    began = dlHttp.begin(dlPlainClient, url);
-  }
-  if (!began) {
-    Serial.println("[ERROR] invalid url");
-    return;
+  const char* headerKeys[] = {"Content-Type", "Location"};
+
+  int code = 0;
+  for (int redirects = 0; redirects <= DOWNLOAD_MAX_REDIRECTS; redirects++) {
+    bool began;
+    if (url.startsWith("https://")) {
+      dlSecureClient.setInsecure();
+      dlSecureClient.setHandshakeTimeout(DOWNLOAD_TLS_HANDSHAKE_TIMEOUT_SEC);
+      began = dlHttp.begin(dlSecureClient, url);
+    } else {
+      began = dlHttp.begin(dlPlainClient, url);
+    }
+    if (!began) {
+      Serial.println("[ERROR] invalid url");
+      return;
+    }
+    dlHttp.setTimeout(DOWNLOAD_HTTP_TIMEOUT_MS);
+
+    if (rangeOffset > 0) {
+      dlHttp.addHeader("Range", "bytes=" + String(rangeOffset) + "-");
+    }
+    dlHttp.addHeader("User-Agent", "FoxESP32FW");
+    dlHttp.collectHeaders(headerKeys, 2);
+
+    code = dlHttp.GET();
+
+    bool isRedirect = (code == 301 || code == 302 || code == 303 || code == 307 || code == 308);
+    if (isRedirect && redirects < DOWNLOAD_MAX_REDIRECTS) {
+      String location = dlHttp.header("Location");
+      dlHttp.end();
+      if (location.length() == 0) break;
+      url = resolveRedirectLocation(url, location);
+      continue;
+    }
+    break;
   }
 
-  if (rangeOffset > 0) {
-    dlHttp.addHeader("Range", "bytes=" + String(rangeOffset) + "-");
-  }
-
-  int code = dlHttp.GET();
-  if (code <= 0 || code >= 400) {
+  if (code <= 0 || code >= 300) {
     Serial.print("[ERROR] download request failed, code=");
     Serial.println(code);
     dlHttp.end();
@@ -906,10 +944,21 @@ void handleDownloadStart(const String& json) {
   dlBytesRead = 0;
   dlActive = true;
 
+  String contentType = dlHttp.header("Content-Type");
+  contentType.replace("\"", "'");
+  contentType.replace("\n", " ");
+  contentType.replace("\r", " ");
+  if (contentType.length() > 48) contentType = contentType.substring(0, 48);
+
   Serial.print("[DOWNLOAD/START/SUCCESS]{\"size\":");
-  Serial.print(dlTotalSize);
-  Serial.println("}");
+  Serial.print(dlTotalSize > 0 ? dlTotalSize : 0);
+  Serial.print(",\"type\":\"");
+  Serial.print(contentType);
+  Serial.println("\"}");
 }
+
+#define DOWNLOAD_STREAM_END_MARKER   ((uint32_t)0x00000000UL)
+#define DOWNLOAD_STREAM_ERROR_MARKER ((uint32_t)0xFFFFFFFFUL)
 
 void handleDownloadStream() {
   if (!dlActive) {
@@ -924,11 +973,15 @@ void handleDownloadStream() {
   bool cancelled = false;
   bool errored = false;
 
+  ChunkedRead cr;
+  chunkedReadInit(&cr, dlHttp);
+
   unsigned long timeoutStart = millis();
   const unsigned long timeoutInterval = HTTP_TIMEOUT_MS;
 
   while (dlHttp.connected() || stream->available() > 0) {
     if (dlTotalSize >= 0 && dlBytesRead >= dlTotalSize) break;
+    if (cr.chunked && cr.done) break;
 
     if (Serial.available()) {
       String line = Serial.readStringUntil('\n');
@@ -939,25 +992,33 @@ void handleDownloadStream() {
       }
     }
 
-    size_t avail = stream->available();
-    if (avail > 0) {
+    size_t want = sizeof(buf);
+    if (!cr.chunked && dlTotalSize >= 0) {
+      int remaining = dlTotalSize - dlBytesRead;
+      if ((int)want > remaining) want = remaining;
+    }
+
+    int got = chunkedReadNext(&cr, stream, (char*)buf, (int)want);
+    if (got > 0) {
       timeoutStart = millis();
-      size_t want = avail > sizeof(buf) ? sizeof(buf) : avail;
-      if (dlTotalSize >= 0) {
-        int remaining = dlTotalSize - dlBytesRead;
-        if ((int)want > remaining) want = remaining;
-      }
-      int got = stream->readBytes(buf, want);
+      uint32_t frameLen = (uint32_t)got;
+      Serial.write((const uint8_t*)&frameLen, 4);
       Serial.write(buf, got);
       dlBytesRead += got;
     } else {
+      if (cr.chunked && cr.done) break;
       if (millis() - timeoutStart > timeoutInterval) {
-        bool expectingMore = (dlTotalSize >= 0) && (dlBytesRead < dlTotalSize);
+        bool expectingMore = cr.chunked ? true : ((dlTotalSize >= 0) && (dlBytesRead < dlTotalSize));
         if (expectingMore) errored = true;
         break;
       }
       delay(1);
     }
+  }
+
+  if (!cancelled) {
+    uint32_t terminator = errored ? DOWNLOAD_STREAM_ERROR_MARKER : DOWNLOAD_STREAM_END_MARKER;
+    Serial.write((const uint8_t*)&terminator, 4);
   }
 
   Serial.flush();
@@ -1356,7 +1417,7 @@ bool handleCommand(const String& line) {
       "[WIFI/DISCONNECT], [WIFI/LIST], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], "
       "[DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], "
       "[LED/OFF], [IP/ADDRESS], [WIFI/AP], [RELEASE/CHECK], [DOWNLOAD/START], "
-      "[DOWNLOAD/STREAM], [DOWNLOAD/CANCEL], [BAUD/SET]");
+      "[DOWNLOAD/STREAM], [DOWNLOAD/CANCEL], [BAUD/SET], [TZ/REFRESH]");
     return true;
   }
 
@@ -1378,6 +1439,15 @@ bool handleCommand(const String& line) {
   }
   if (cmd == "WIFI/FORGET") { handleWifiForget(rest); return true; }
   if (cmd == "WIFI/LIST") { handleWifiList(); return true; }
+  if (cmd == "TZ/REFRESH") {
+    if (WiFi.status() == WL_CONNECTED) {
+      FoxTz::refreshOffset();
+      Serial.println("[TZ/REFRESH/DONE]");
+    } else {
+      Serial.println("[TZ/REFRESH/SKIP]");
+    }
+    return true;
+  }
   if (cmd == "WIFI/SAVED/LIST") { handleWifiSavedList(); return true; }
 
   if (cmd == "WIFI/STATUS") {

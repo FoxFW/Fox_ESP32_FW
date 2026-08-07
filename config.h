@@ -21,7 +21,14 @@
 #define LINE_BUFFER_MAX 2200
 #define HEX_BUFFER_MAX 256
 
-#define FOX_FIRMWARE_VERSION "1.1.1"
+// Default max is ~19.5dBm. WiFi TX bursts (especially combined with TLS
+// handshake CPU load) can pull enough current to brown out a board on a
+// marginal power supply - trading a bit of range for a lower peak current
+// draw fixes that on the software side. WIFI_POWER_15dBm, not any lower,
+// to keep recon/attack range from taking too much of a hit.
+#define FOX_WIFI_TX_POWER WIFI_POWER_15dBm
+
+#define FOX_FIRMWARE_VERSION "1.2.0"
 
 #define BLE_SCAN_SECONDS 5
 
@@ -62,6 +69,9 @@
 #define WIFI_SAVED_MAX 5
 #define HTTP_BODY_MAX 2048
 #define HTTP_TIMEOUT_MS 10000
+#define DOWNLOAD_HTTP_TIMEOUT_MS 25000
+#define DOWNLOAD_MAX_REDIRECTS 5
+#define DOWNLOAD_TLS_HANDSHAKE_TIMEOUT_SEC 18
 #define HTTP_BYTES_MAX 3072
 
 #define DOWNLOAD_STREAM_FRAME 1024
@@ -69,12 +79,13 @@
 
 #define WEBSOCKET_RECONNECT_MS 5000
 
-#define DISCORD_TOKEN_MAX 128
-#define DISCORD_CHANNEL_ID_MAX 32
 #define DISCORD_READ_LIMIT_DEFAULT 5
 #define DISCORD_READ_LIMIT_MAX 10
 #define DISCORD_CONTENT_PREVIEW_MAX 100
 #define DISCORD_POST_MIN_INTERVAL_MS 3000
+
+#define FOXCHAT_RELAY_BASE_URL "https://foxfw-chat-relay.foxcustomfirmware.workers.dev"
+#define FOXCHAT_RELAY_APP_KEY  "foxfw-esp32-chat-v1"
 
 #define SCRIPT_SOURCE_MAX 2048
 #define SCRIPT_TOKENS_MAX 512

@@ -7,39 +7,9 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-#include <Preferences.h>
 #include <string.h>
 
 namespace {
-Preferences discordPrefs;
-bool credsLoaded = false;
-String botToken;
-String channelId;
-
-void loadCredsIfNeeded() {
-  if (credsLoaded) return;
-  discordPrefs.begin("foxdiscord", true);
-  botToken = discordPrefs.getString("token", "");
-  channelId = discordPrefs.getString("channel", "");
-  discordPrefs.end();
-  credsLoaded = true;
-}
-
-bool hasCreds() {
-  loadCredsIfNeeded();
-  return botToken.length() > 0 && channelId.length() > 0;
-}
-
-void doInit(const String& token, const String& channel) {
-  discordPrefs.begin("foxdiscord", false);
-  discordPrefs.putString("token", token);
-  discordPrefs.putString("channel", channel);
-  discordPrefs.end();
-  botToken = token;
-  channelId = channel;
-  credsLoaded = true;
-  Serial.println("OK");
-}
 
 bool jsonExtractString(const String& json, const String& key, String* out) {
   String pattern = "\"" + key + "\"";
@@ -183,6 +153,13 @@ int monthFromAbbrev(const String& abbr) {
   return 0;
 }
 
+const char* monthAbbrev(int mon) {
+  static const char* names[] = {
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  if (mon < 1 || mon > 12) return "???";
+  return names[mon - 1];
+}
+
 bool parseHttpDate(const String& d, SimpleDT* out) {
   if (d.length() < 25) return false;
   if (!isAllDigits(d, 5, 2) || !isAllDigits(d, 12, 4) || !isAllDigits(d, 17, 2) ||
@@ -202,10 +179,6 @@ bool parseHttpDate(const String& d, SimpleDT* out) {
 unsigned long lastPostAttemptMs = 0;
 
 void doPost(const String& message) {
-  if (!hasCreds()) {
-    Serial.println("ERROR:NOTINIT");
-    return;
-  }
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("ERROR:NOWIFI");
     return;
@@ -237,12 +210,12 @@ void doPost(const String& message) {
   http.setTimeout(HTTP_TIMEOUT_MS);
   WiFiClientSecure secureClient;
   secureClient.setInsecure();
-  String url = "https://discord.com/api/v10/channels/" + channelId + "/messages";
+  String url = String(FOXCHAT_RELAY_BASE_URL) + "/post";
   if (!http.begin(secureClient, url)) {
     Serial.println("ERROR:BADURL");
     return;
   }
-  http.addHeader("Authorization", "Bot " + botToken);
+  http.addHeader("X-App-Key", FOXCHAT_RELAY_APP_KEY);
   http.addHeader("Content-Type", "application/json");
 
   String payload = "{\"content\":\"" + escaped + "\",\"allowed_mentions\":{\"parse\":[]}}";
@@ -258,10 +231,6 @@ void doPost(const String& message) {
 }
 
 void doRead(int limit) {
-  if (!hasCreds()) {
-    Serial.println("ERROR:NOTINIT");
-    return;
-  }
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("ERROR:NOWIFI");
     return;
@@ -273,12 +242,12 @@ void doRead(int limit) {
   http.setTimeout(HTTP_TIMEOUT_MS);
   WiFiClientSecure secureClient;
   secureClient.setInsecure();
-  String url = "https://discord.com/api/v10/channels/" + channelId + "/messages?limit=" + String(limit);
+  String url = String(FOXCHAT_RELAY_BASE_URL) + "/read?limit=" + String(limit);
   if (!http.begin(secureClient, url)) {
     Serial.println("ERROR:BADURL");
     return;
   }
-  http.addHeader("Authorization", "Bot " + botToken);
+  http.addHeader("X-App-Key", FOXCHAT_RELAY_APP_KEY);
   const char* headerKeys[] = {"Date"};
   http.collectHeaders(headerKeys, 1);
   int code = http.GET();
@@ -314,6 +283,7 @@ void doRead(int limit) {
     }
 
     char timeField[16];
+    char fullTimeField[24];
     SimpleDT msgLocal;
     if (parseIsoDt(timestamp, &msgLocal)) {
       applyOffset(&msgLocal, offsetMinutes);
@@ -327,12 +297,18 @@ void doRead(int limit) {
             timeField, sizeof(timeField), "%c%02d/%02d %02d:%02d", tag, msgLocal.day, msgLocal.mon,
             msgLocal.hour, msgLocal.min);
       }
+      snprintf(
+          fullTimeField, sizeof(fullTimeField), "%c%02d %s %04d, %02d:%02d", tag, msgLocal.day,
+          monthAbbrev(msgLocal.mon), msgLocal.year, msgLocal.hour, msgLocal.min);
     } else {
       snprintf(timeField, sizeof(timeField), "Z--:--");
+      snprintf(fullTimeField, sizeof(fullTimeField), "Zunknown time");
     }
 
     Serial.print("DISCORDMSG:");
     Serial.print(timeField);
+    Serial.print("|");
+    Serial.print(fullTimeField);
     Serial.print("|");
     Serial.println(content);
   }
@@ -342,24 +318,6 @@ void doRead(int limit) {
 
 namespace FoxDiscord {
 bool handleCommand(const String& line) {
-  if (line.startsWith("DISCORDINIT:")) {
-    String rest = line.substring(strlen("DISCORDINIT:"));
-    int c = rest.indexOf(':');
-    if (c < 0) {
-      Serial.println("ERROR:BADFORMAT");
-      return true;
-    }
-    String token = rest.substring(0, c);
-    String channel = rest.substring(c + 1);
-    if (token.length() == 0 || channel.length() == 0 ||
-        (int)token.length() > DISCORD_TOKEN_MAX || (int)channel.length() > DISCORD_CHANNEL_ID_MAX) {
-      Serial.println("ERROR:BADFORMAT");
-      return true;
-    }
-    doInit(token, channel);
-    return true;
-  }
-
   if (line.startsWith("DISCORDPOST:")) {
     doPost(line.substring(strlen("DISCORDPOST:")));
     return true;

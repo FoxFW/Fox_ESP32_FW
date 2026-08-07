@@ -508,6 +508,7 @@ void begin() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   WiFi.setSleep(false);
+  WiFi.setTxPower(FOX_WIFI_TX_POWER);
 }
 
 bool getSelectedAp(uint8_t bssidOut[6], uint8_t* channelOut, String* ssidOut) {
