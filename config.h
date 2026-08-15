@@ -28,7 +28,7 @@
 // to keep recon/attack range from taking too much of a hit.
 #define FOX_WIFI_TX_POWER WIFI_POWER_15dBm
 
-#define FOX_FIRMWARE_VERSION "1.2.1"
+#define FOX_FIRMWARE_VERSION "1.2.2"
 
 #define BLE_SCAN_SECONDS 5
 
@@ -86,6 +86,15 @@
 
 #define FOXCHAT_RELAY_BASE_URL "https://foxfw-chat-relay.foxcustomfirmware.workers.dev"
 #define FOXCHAT_RELAY_APP_KEY  "foxfw-esp32-chat-v1"
+
+#define GEMINI_API_TIMEOUT_MS 20000
+#define GEMINI_RATELIMIT_COOLDOWN_SEC 60
+
+/* Set these to match your deployed Cloudflare Worker (see
+ * cloudflare_worker/gemini_relay.js) - GEMINI_RELAY_APP_KEY just needs to
+ * match the Worker's APP_KEY secret exactly, it isn't a real credential. */
+#define GEMINI_RELAY_BASE_URL "https://foxfw-gemini-relay.foxcustomfirmware.workers.dev"
+#define GEMINI_RELAY_APP_KEY  "foxfw-esp32-gemini-v1"
 
 #define SCRIPT_SOURCE_MAX 2048
 #define SCRIPT_TOKENS_MAX 512

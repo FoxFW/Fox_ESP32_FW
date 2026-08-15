@@ -50,7 +50,10 @@ bool isFlock(BLEAdvertisedDevice& device) {
   if (data.length() < 2) return false;
   const uint8_t* b = (const uint8_t*)data.c_str();
 
-  return b[0] == 0xA8 && b[1] == 0x09;
+  // Flock Safety's manufacturer id (XUNTONG) is 0x09C8, little-endian in the
+  // advert -> bytes [0xC8, 0x09]. Was [0xA8, 0x09] (company 0x09A8) - a
+  // one-digit transcription slip that meant this never matched real hardware.
+  return b[0] == 0xC8 && b[1] == 0x09;
 }
 
 bool isMeta(BLEAdvertisedDevice& device) {
@@ -60,6 +63,14 @@ bool isMeta(BLEAdvertisedDevice& device) {
   const uint8_t* b = (const uint8_t*)data.c_str();
 
   return b[0] == 0x5B && b[1] == 0x07;
+}
+
+void printHexData(const String& data) {
+  const uint8_t* b = (const uint8_t*)data.c_str();
+  for (size_t i = 0; i < data.length(); i++) {
+    if (b[i] < 0x10) Serial.print('0');
+    Serial.print(b[i], HEX);
+  }
 }
 
 const char* batteryLabel(uint8_t status) {
@@ -112,6 +123,18 @@ public:
     if (haveBattery) {
       Serial.print(" batt:");
       Serial.print(batteryLabel(battery));
+    }
+    if (type == TagType::FLOCK) {
+      // FoxFlock needs the raw mfg payload (Flock's shared external-battery
+      // advert carries an ASCII serial inside it) and GAP name (older
+      // firmware identifies as "Penguin-NNNN" / "FS Ext Battery") to tell
+      // units apart - the address alone repeats across a whole deployment.
+      Serial.print(" name:\"");
+      Serial.print(device.haveName() ? device.getName().c_str() : "");
+      Serial.print("\" mfg:");
+      if (device.haveManufacturerData()) {
+        printHexData(device.getManufacturerData());
+      }
     }
     Serial.println();
   }

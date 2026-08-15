@@ -117,11 +117,27 @@ void printStaEntry(int index) {
   Serial.print(" rssi:"); Serial.println(e.rssi);
 }
 
+// Extracts the SSID information element starting at `ieOffset` in an 802.11
+// frame body. Returns "" if the frame is too short, the tag at that offset
+// isn't 0x00 (SSID), or the declared length doesn't fit - same technique
+// SNIFF_MULTISSID already uses below, factored out so BEACON/PROBE can share it.
+String extractSsid(const uint8_t* payload, int len, int ieOffset) {
+  if (ieOffset + 2 > len) return String();
+  if (payload[ieOffset] != 0x00) return String();
+  uint8_t ssidLen = payload[ieOffset + 1];
+  if (ssidLen > 32 || ieOffset + 2 + ssidLen > len) return String();
+  char ssidBuf[33];
+  memcpy(ssidBuf, payload + ieOffset + 2, ssidLen);
+  ssidBuf[ssidLen] = 0;
+  return String(ssidBuf);
+}
+
 void IRAM_ATTR promiscuousCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
   auto* pkt = (wifi_promiscuous_pkt_t*)buf;
   const uint8_t* payload = pkt->payload;
   int len = pkt->rx_ctrl.sig_len;
   int rssi = pkt->rx_ctrl.rssi;
+  int channel = pkt->rx_ctrl.channel;
 
   switch (promiscMode) {
     case PromiscMode::PACKETCOUNT:
@@ -159,7 +175,12 @@ void IRAM_ATTR promiscuousCallback(void* buf, wifi_promiscuous_pkt_type_t type) 
       if (payload[0] != 0x80) return;
       const uint8_t* bssid = payload + 16;
       Serial.print("BEACON:"); Serial.print(macToString(bssid));
-      Serial.print(" rssi:"); Serial.println(rssi);
+      Serial.print(" ch:"); Serial.print(channel);
+      Serial.print(" rssi:"); Serial.print(rssi);
+      // IEs start after the 24-byte MAC header + 12-byte fixed params block
+      // (timestamp 8 + beacon interval 2 + capability 2) - SSID is normally
+      // the first IE.
+      Serial.print(" ssid:\""); Serial.print(extractSsid(payload, len, 36)); Serial.println("\"");
       return;
     }
 
@@ -178,15 +199,28 @@ void IRAM_ATTR promiscuousCallback(void* buf, wifi_promiscuous_pkt_type_t type) 
       if (len < 24) return;
       if (payload[0] != 0x40 && payload[0] != 0x50) return;
       const uint8_t* src = payload + 10;
-      Serial.print(payload[0] == 0x40 ? "PROBEREQ:" : "PROBERESP:");
-      Serial.println(macToString(src));
+      bool isReq = (payload[0] == 0x40);
+      Serial.print(isReq ? "PROBEREQ:" : "PROBERESP:");
+      Serial.print(macToString(src));
+      Serial.print(" ch:"); Serial.print(channel);
+      Serial.print(" rssi:"); Serial.print(rssi);
+      // Probe REQUESTS have no fixed-params block - IEs start right after the
+      // 24-byte MAC header. Probe RESPONSES carry the same timestamp/interval/
+      // capability block as beacons, so their IEs start at the same offset 36.
+      Serial.print(" ssid:\""); Serial.print(extractSsid(payload, len, isReq ? 24 : 36)); Serial.println("\"");
       return;
     }
 
     case PromiscMode::SNIFF_RAW: {
       if (len < 24) return;
+      // Source MAC (offset 10) is common to data/mgmt frames sharing the
+      // standard 24-byte header - control frames (ACK etc.) are shorter and
+      // this field isn't meaningful for them, but RAW mode already accepts
+      // any frame type so a best-effort MAC beats none for the common case.
       Serial.print("RAW:len:"); Serial.print(len);
-      Serial.print(" rssi:"); Serial.println(rssi);
+      Serial.print(" ch:"); Serial.print(channel);
+      Serial.print(" rssi:"); Serial.print(rssi);
+      Serial.print(" mac:"); Serial.println(macToString(payload + 10));
       return;
     }
 

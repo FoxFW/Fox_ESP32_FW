@@ -14,6 +14,7 @@
 #include "fox_portal.h"
 #include "discord.h"
 #include "fox_csi.h"
+#include "gemini.h"
 
 SET_LOOP_TASK_STACK_SIZE(32 * 1024);
 
@@ -63,6 +64,7 @@ void handleCommand(const String& line) {
   if (FoxPortal::handleCommand(line)) return;
   if (FoxDiscord::handleCommand(line)) return;
   if (FoxCsi::handleCommand(line)) return;
+  if (FoxGemini::handleCommand(line)) return;
 
   if (line.length() > 0) {
     Serial.print("ECHO:");
