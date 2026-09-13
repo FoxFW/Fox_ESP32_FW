@@ -52,7 +52,10 @@ void setExpertModeEnabled(bool enabled) {
   }
 }
 
-bool handleSettingsCommand(const String& line) {
+bool handleSettingsCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line == "SETTINGS") {
     Serial.print("ATTACKS:");
     Serial.println(attacksEnabled() ? "ON" : "OFF");
@@ -121,5 +124,7 @@ bool handleSettingsCommand(const String& line) {
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }

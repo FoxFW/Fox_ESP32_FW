@@ -83,6 +83,13 @@ const char* batteryLabel(uint8_t status) {
   }
 }
 
+// NOT SINK-REDIRECTED: TagScanCallback::onResult below runs during the
+// synchronous scan->start() call inside runTagScan(), but stays hardcoded
+// to Serial rather than threading `out` through the callback class -
+// a BLETAGSCAN issued over HTTP/WS would get the TAGSCANDONE:<count>
+// summary but the individual TAG:... lines would still only appear on the
+// physical UART. Revisit if/when task #10/#11 needs live tag-scan results
+// over HTTP/WS.
 class TagScanCallback : public BLEAdvertisedDeviceCallbacks {
 public:
   TagType type;
@@ -210,7 +217,10 @@ bool runSpoofAirTag() {
   return true;
 }
 
-bool runTagScan(TagType type) {
+bool runTagScan(TagType type, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!FoxBle::ensureInitialized()) return false;
 
   BLEScan* scan = BLEDevice::getScan();
@@ -226,11 +236,16 @@ bool runTagScan(TagType type) {
   Serial.print("TAGSCANDONE:");
   Serial.println(cb->foundCount);
   return true;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 namespace FoxBleTags {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line.startsWith("BLETAGSCAN:")) {
     String modeStr = line.substring(11);
     modeStr.trim();
@@ -247,7 +262,7 @@ bool handleCommand(const String& line) {
       return true;
     }
 
-    if (!runTagScan(type)) {
+    if (!runTagScan(type, out)) {
       Serial.println("ERROR");
     }
     return true;
@@ -263,18 +278,25 @@ bool handleCommand(const String& line) {
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 #else
 
 namespace FoxBleTags {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line.startsWith("BLETAGSCAN:") || line == "SPOOFAT") {
     Serial.println("ERROR:Incompatible ESP32-S2 Module has no BLE");
     return true;
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 

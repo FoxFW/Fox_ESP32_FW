@@ -103,16 +103,24 @@ void randomStaticAddress(uint8_t addr[6]) {
   addr[5] = (uint8_t)((addr[5] & 0x3F) | 0xC0);
 }
 
-bool refuseIfDisabled() {
+bool refuseIfDisabled(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!FoxSettings::attacksEnabled()) {
     Serial.println("ERROR:DISABLED");
     return true;
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 #if FOX_BLE_NIMBLE
-void runSpam(int mode) {
+void runSpam(int mode, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!FoxBle::ensureInitialized()) { Serial.println("ERROR"); return; }
 
   BLEAdvertising* pAdv = BLEDevice::getAdvertising();
@@ -151,11 +159,16 @@ void runSpam(int mode) {
   }
   pAdv->stop();
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 #else
 
-void runSpam(int mode) {
+void runSpam(int mode, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!FoxBle::ensureInitialized()) { Serial.println("ERROR"); return; }
 
   esp_ble_adv_params_t advParams = {};
@@ -192,30 +205,37 @@ void runSpam(int mode) {
   }
   esp_ble_gap_stop_advertising();
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 #endif
 }
 
 namespace FoxBleAttack {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!line.startsWith("BLESPAM:")) return false;
 
-  if (refuseIfDisabled()) return true;
+  if (refuseIfDisabled(out)) return true;
 
   String mode = line.substring(8);
   mode.trim();
   mode.toUpperCase();
 
-  if (mode == "IOS") { runSpam(0); return true; }
-  if (mode == "WINDOWS") { runSpam(1); return true; }
-  if (mode == "SAMSUNG") { runSpam(2); return true; }
-  if (mode == "ANDROID" || mode == "GOOGLE") { runSpam(3); return true; }
-  if (mode == "ALL") { runSpam(4); return true; }
-  if (mode == "FLIPPER") { runSpam(5); return true; }
+  if (mode == "IOS") { runSpam(0, out); return true; }
+  if (mode == "WINDOWS") { runSpam(1, out); return true; }
+  if (mode == "SAMSUNG") { runSpam(2, out); return true; }
+  if (mode == "ANDROID" || mode == "GOOGLE") { runSpam(3, out); return true; }
+  if (mode == "ALL") { runSpam(4, out); return true; }
+  if (mode == "FLIPPER") { runSpam(5, out); return true; }
 
   Serial.println("ERROR:BADMODE");
   return true;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 bool scriptSpam(const String& modeArg) {
@@ -235,10 +255,15 @@ bool scriptSpam(const String& modeArg) {
 #else
 
 namespace FoxBleAttack {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!line.startsWith("BLESPAM:")) return false;
   Serial.println("ERROR:Incompatible ESP32-S2 Module has no BLE");
   return true;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 bool scriptSpam(const String&) { return false; }

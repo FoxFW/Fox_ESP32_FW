@@ -54,12 +54,17 @@ String exportSafeLine(const String& line) {
 String pendingExportNames[LOG_EXPORT_MAX_FILES];
 int pendingExportCount = 0;
 
-bool refuseIfDisabled() {
+bool refuseIfDisabled(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!FoxSettings::attacksEnabled()) {
     Serial.println("ERROR:DISABLED");
     return true;
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 String loadPage(const char* path) {
@@ -182,7 +187,10 @@ String buildDefaultThanksTemplate() {
   return html;
 }
 
-void sendChunkedPage(const char* prefix, const String& html) {
+void sendChunkedPage(const char* prefix, const String& html, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   Serial.print(prefix);
   Serial.println(":BEGIN");
   const int chunkSize = 160;
@@ -196,6 +204,8 @@ void sendChunkedPage(const char* prefix, const String& html) {
   }
   Serial.print(prefix);
   Serial.println(":END");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 String buildDefaultThanksHtml(const String* names, const String* values, int count) {
@@ -226,6 +236,10 @@ String buildDefaultThanksHtml(const String* names, const String* values, int cou
   return html;
 }
 
+// NOT SINK-REDIRECTED: only ever called from handleSubmit(), the async
+// WebServer POST route handler below - not from handleCommand()'s call
+// chain. Its Serial prints are UART debug tracing of a captive-portal
+// victim's submission, not a reply to any AT-command.
 void logSubmission(const String* names, const String* values, int count) {
   String path = "/" + String(LOG_FILE_PREFIX) + currentDate + String(LOG_FILE_SUFFIX);
   Serial.print("[PORTAL] logSubmission path=");
@@ -255,7 +269,10 @@ void logSubmission(const String* names, const String* values, int count) {
   Serial.println(sizeAfter);
 }
 
-void exportLogs() {
+void exportLogs(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   LittleFS.begin(true);
 
   File root = LittleFS.open("/");
@@ -345,16 +362,30 @@ void exportLogs() {
   Serial.print(pendingExportCount);
   Serial.print(":");
   Serial.println(totalLines);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void confirmExportAndDelete() {
+void confirmExportAndDelete(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   for (int i = 0; i < pendingExportCount; i++) {
     LittleFS.remove(pendingExportNames[i]);
   }
   pendingExportCount = 0;
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
+// NOT SINK-REDIRECTED: handleServe/handleRedirect/handleSubmit are
+// WebServer route handlers invoked by webServer.handleClient() inside
+// FoxPortal::loop() whenever a captive-portal victim's browser makes a
+// request - not part of any single handleCommand() call's chain, and not
+// reachable from the esp32-tab's HTTP/WS dispatch tables (tasks #10/#11).
+// Their Serial prints are UART debug tracing, same as fox_lab.cpp's
+// handleLabRoot().
 void handleServe() {
   Serial.print("[PORTAL] GET ");
   Serial.print(webServer.uri());
@@ -422,7 +453,10 @@ void handleSubmit() {
   webServer.send(200, "text/html", page);
 }
 
-void startPortal(const String& ssid, const String& date) {
+void startPortal(const String& ssid, const String& date, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   currentSsid = ssid.length() > 0 ? ssid : String(FOX_PORTAL_DEFAULT_SSID);
   currentDate = date.length() > 0 ? date : String("unknown-date");
 
@@ -463,9 +497,14 @@ void startPortal(const String& ssid, const String& date) {
   portalActive = true;
   Serial.print("FOXPORTAL:STARTED:");
   Serial.println(currentSsid);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void stopPortal() {
+void stopPortal(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!portalActive) {
     Serial.println("FOXPORTAL:STOPPED");
     return;
@@ -496,11 +535,15 @@ void stopPortal() {
   Serial.flush();
   delay(50);
   ESP.restart();
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 }
 
 namespace FoxPortal {
+// NOT SINK-REDIRECTED: the per-tick loop, not part of any single
+// handleCommand() call's chain - see the comment above handleServe().
 void loop() {
   if (!portalActive) return;
   dnsServer.processNextRequest();
@@ -514,9 +557,12 @@ void loop() {
   }
 }
 
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line.startsWith("WIFIFOXPORTAL:START")) {
-    if (refuseIfDisabled()) return true;
+    if (refuseIfDisabled(out)) return true;
     String rest = line.substring(strlen("WIFIFOXPORTAL:START"));
     String ssid, date;
     if (rest.startsWith(":")) {
@@ -529,12 +575,12 @@ bool handleCommand(const String& line) {
         ssid = rest;
       }
     }
-    startPortal(ssid, date);
+    startPortal(ssid, date, out);
     return true;
   }
 
   if (line == "WIFIFOXPORTAL:STOP") {
-    stopPortal();
+    stopPortal(out);
     return true;
   }
 
@@ -551,24 +597,24 @@ bool handleCommand(const String& line) {
   if (line == "WIFIFOXPORTAL:GETDEFAULTSTART") {
     LittleFS.begin(true);
     loadTitleIntroNote();
-    sendChunkedPage("FOXPORTAL:DEFAULTSTART", buildDefaultStartHtml());
+    sendChunkedPage("FOXPORTAL:DEFAULTSTART", buildDefaultStartHtml(), out);
     return true;
   }
 
   if (line == "WIFIFOXPORTAL:GETDEFAULTTHANKS") {
     LittleFS.begin(true);
     loadTitleIntroNote();
-    sendChunkedPage("FOXPORTAL:DEFAULTTHANKS", buildDefaultThanksTemplate());
+    sendChunkedPage("FOXPORTAL:DEFAULTTHANKS", buildDefaultThanksTemplate(), out);
     return true;
   }
 
   if (line == "WIFIFOXPORTAL:EXPORTLOG") {
-    exportLogs();
+    exportLogs(out);
     return true;
   }
 
   if (line == "WIFIFOXPORTAL:EXPORTCONFIRM") {
-    confirmExportAndDelete();
+    confirmExportAndDelete(out);
     return true;
   }
 
@@ -666,5 +712,7 @@ bool handleCommand(const String& line) {
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }

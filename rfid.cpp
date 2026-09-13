@@ -40,7 +40,10 @@ void printHex(const uint8_t* data, size_t length) {
   }
 }
 
-void doInit() {
+void doInit(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   nfc.begin();
   uint32_t version = nfc.getFirmwareVersion();
   if (!version) {
@@ -50,13 +53,18 @@ void doInit() {
   nfc.SAMConfig();
   rfidInitialized = true;
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 bool scanOnce(uint8_t* uid, uint8_t* uidLength, uint16_t timeoutMs) {
   return nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLength, timeoutMs);
 }
 
-void doScan() {
+void doScan(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t uid[7];
   uint8_t uidLength;
   if (!scanOnce(uid, &uidLength, 2000)) {
@@ -66,9 +74,14 @@ void doScan() {
   Serial.print("UID:");
   printHex(uid, uidLength);
   Serial.println();
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doRead(int block) {
+void doRead(int block, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t uid[7];
   uint8_t uidLength;
   if (!scanOnce(uid, &uidLength, 2000)) {
@@ -89,9 +102,14 @@ void doRead(int block) {
   Serial.print(":");
   printHex(data, 16);
   Serial.println();
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doWrite(int block, const String& hexStr) {
+void doWrite(int block, const String& hexStr, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t data[16];
   size_t length;
   if (!hexToBytes(hexStr, data, sizeof(data), &length) || length != 16) {
@@ -113,13 +131,18 @@ void doWrite(int block, const String& hexStr) {
     return;
   }
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 namespace FoxRfid {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line == "RFIDINIT") {
-    doInit();
+    doInit(out);
     return true;
   }
 
@@ -131,13 +154,13 @@ bool handleCommand(const String& line) {
   }
 
   if (line == "RFIDSCAN") {
-    doScan();
+    doScan(out);
     return true;
   }
 
   if (line.startsWith("RFIDREAD:")) {
     int block = line.substring(strlen("RFIDREAD:")).toInt();
-    doRead(block);
+    doRead(block, out);
     return true;
   }
 
@@ -150,7 +173,7 @@ bool handleCommand(const String& line) {
     }
     int block = rest.substring(0, c).toInt();
     String hexStr = rest.substring(c + 1);
-    doWrite(block, hexStr);
+    doWrite(block, hexStr, out);
     return true;
   }
 
@@ -160,13 +183,18 @@ bool handleCommand(const String& line) {
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 #else
 
 namespace FoxRfid {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   static const char* prefixes[] = {
     "RFIDINIT", "RFIDSCAN", "RFIDREAD:", "RFIDWRITE:", "RFIDEMULATE:"
   };
@@ -177,6 +205,8 @@ bool handleCommand(const String& line) {
     }
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 

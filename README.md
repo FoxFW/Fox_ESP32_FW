@@ -32,6 +32,7 @@ the main [FoxFW2.0](https://github.com/FoxFW/2.0) repository, all under
 | App | What it does |
 |---|---|
 | **Fox ESP32 Commander** | The main control hub — WiFi recon and attacks, BLE scanning and tag detection, the HTTP/WebSocket bridge, the FoxScript engine, and a raw Terminal |
+| **FoxLAB** | Opens a full browser control page hosted directly on this firmware's own WiFi hotspot — no USB, no PC. See below. |
 | **Fox ESP32 Detector** | Scans every GPIO pin pair and baud rate to confirm your wiring and identify this firmware |
 | **Fox ESP32 Flasher** | Flashes this firmware onto a connected board directly from the Flipper — no PC required |
 | **Fox Update Downloader** | Checks GitHub for newer releases of this firmware (and FoxFW itself), downloads them over this same UART bridge, and hands off to install |
@@ -154,6 +155,37 @@ connection is required.
 | Input fields | Up to 12 configurable named text fields |
 | Submission log | Submitted responses stream back to the Flipper over UART |
 | Standalone | No internet connection — runs entirely on the ESP32 soft-AP |
+
+---
+
+### FoxLAB — browser control page
+
+Started/stopped by an `LAB/START` / `LAB/STOP` AT-command from the
+Flipper's **FoxLAB** app (same shared-UART pattern as every other command in
+this firmware), FoxLAB stands up its own WiFi access point — SSID `FoxLAB`,
+password `88888888` — and serves a full control page directly from flash at
+`http://192.168.4.1/`. No PC, no USB, no CDN dependency — the page (and the
+vendored protobufjs runtime + Flipper RPC schema it needs for the Flipper
+tab) is embedded in the firmware image itself.
+
+Three servers back the page, all on the `FoxLAB` AP:
+
+| Port | Server | Purpose |
+|---|---|---|
+| 80 | `WebServer` | Serves the page itself, plus `POST /api/cmd` — a bounded request/response endpoint that runs any AT-command through the same dispatcher the UART uses |
+| 82 | `WebSocketsServer` | Tunnels a real Flipper Expansion-Protocol RPC session to the browser's Flipper tab — opaque bytes only, no protobuf on the ESP32 side |
+| 83 | `WebSocketsServer` | The ESP32 tab's command channel — every AT-command available over UART, with each reply line delivered live as its own WebSocket frame (the right fit for open-ended commands like sniffs and scans) |
+
+The Flipper RPC session on port 82 needs the Flipper sitting outside any Fox
+app (its home screen works) — like every Fox app, FoxLAB itself holds the
+shared UART exclusively while it's open, so the Flipper's native Expansion/
+RPC service is only reachable when nothing Fox-branded currently owns that
+wire. The page's Flipper tab explains this if the RPC handshake fails.
+
+FoxLAB and `fox_csi.cpp`'s own web UI (`CSI/WEBUI/ON`, AP `FoxCSI`) are
+mutually exclusive — the ESP32 can only run one soft-AP SSID and bind port
+80 once, so starting either one while the other is active is refused with
+an explicit error rather than silently corrupting both.
 
 ---
 

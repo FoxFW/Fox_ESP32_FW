@@ -1,0 +1,3811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FoxFW Lab — Browser Toolkit</title>
+<style>
+:root{--orange:#e8750a;--dark:#0d0d0d;--mid:#161616;--card:#1e1e1e;--border:#2a2a2a;--light:#f0ebe5;--accent:#ff9a3c;--green:#3dba6a;--red:#e04040;--glow:rgba(232,117,10,.22);--mono:Consolas,'SF Mono','JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--dark);color:var(--light);display:flex;flex-direction:column;min-height:100vh}
+
+/* Scrollbars */
+*{scrollbar-width:thin;scrollbar-color:#3a3a3a transparent}
+*::-webkit-scrollbar{width:9px;height:9px}
+*::-webkit-scrollbar-track{background-color:transparent}
+*::-webkit-scrollbar-thumb{background-color:#3a3a3a;border-radius:20px;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background-color:var(--orange)}
+*::-webkit-scrollbar-corner{background-color:transparent}
+
+/* 3-column grid rather than flex space-between - the status pills sit in
+   the true center column of the bar (with an empty mirror column on the
+   right balancing the logo on the left) rather than hugging the right
+   edge like the old flex layout put them. */
+.topbar{background:#080808;border-bottom:1px solid var(--border);padding:11px 22px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;flex-shrink:0;gap:12px}
+.tb-left{display:flex;align-items:center;gap:10px}
+.logo{font-size:1.05rem;font-weight:700;color:var(--accent)}.logo span{color:#fff}
+.tb-right{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;grid-column:2}
+.status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:#888;font-size:.76rem}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:#c0392b;flex-shrink:0}
+.status-pill.connected{color:var(--green);border-color:#1f4a30}
+.status-pill.connected .dot{background:var(--green);box-shadow:0 0 6px var(--green);animation:blk 1.6s steps(2) infinite}
+@keyframes blk{50%{opacity:.25}}
+.bsm{border:1px solid var(--border);background:transparent;color:#ccc;font-size:.8rem;padding:7px 16px;border-radius:5px;cursor:pointer;transition:all .15s;font-family:inherit}
+.bsm:hover{color:#fff;border-color:#555}
+.bsm.pri{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600;box-shadow:0 0 10px var(--glow)}
+.bsm.pri:hover{background:var(--accent);border-color:var(--accent)}
+.bsm.sm{padding:5px 11px;font-size:.72rem}
+.bsm:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+
+.shell{flex:1;display:flex;min-height:0}
+
+.sidebar{width:64px;background:#0a0a0a;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:0 0 20px;flex-shrink:0;overflow-y:auto;transition:width .18s ease}
+.sidebar.expanded{width:196px;align-items:stretch}
+.dev-tabs{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);width:100%;align-items:center}
+.dev-tab{width:44px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.04em;color:#666;cursor:pointer;border:1px solid transparent;background:transparent}
+.dev-tab:hover:not(.disabled){color:#aaa}
+.dev-tab.active{background:rgba(232,117,10,.15);border-color:var(--orange);color:var(--accent)}
+.dev-tab.disabled{opacity:.3;cursor:not-allowed}
+.sidebar.expanded .dev-tabs{flex-direction:row;align-items:stretch}
+.sidebar.expanded .dev-tab{flex:1;width:auto}
+.sec-icons{display:none;flex-direction:column;gap:4px;width:100%;align-items:center}
+.sec-icons.active{display:flex}
+.sec-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:12px;border-radius:8px;font-size:1.2rem;cursor:pointer;color:#777;border:1px solid transparent;position:relative;background:transparent;flex-shrink:0}
+.sec-icon:hover{background:var(--card);color:#ccc}
+.sec-icon.active{background:rgba(232,117,10,.15);border-color:var(--orange);color:var(--accent)}
+.sec-icon .tip{position:fixed;top:-999px;left:-999px;transform:translateY(-50%);background:#000;border:1px solid var(--border);color:#ddd;font-size:.72rem;padding:4px 9px;border-radius:5px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s;z-index:50}
+.sidebar:not(.expanded) .sec-icon:hover .tip{opacity:1}
+.sidebar.expanded .sec-icon{width:100%;justify-content:flex-start;padding:0 15px}
+.sidebar.expanded .sec-icon .tip{position:static;transform:none;opacity:1;pointer-events:none;background:transparent;border:none;padding:0;color:inherit;font-size:.82rem;font-weight:inherit;overflow:hidden;text-overflow:ellipsis}
+/* position:sticky + top:0, flush against the sidebar's own top edge (its
+   padding-top is 0, see .sidebar above) with no border/radius on the sides
+   that would read as a floating pill - this is what keeps it pinned in
+   place with no gap as the icon list scrolls underneath, instead of
+   scrolling away with everything else. align-self:stretch + width:auto
+   (not just in the .expanded variant below) makes it span the sidebar's
+   full width even collapsed, so nothing can visually slip past its edges
+   either. Real-hardware feedback, 2026-09-11. */
+.sidebar-toggle{position:sticky;top:0;z-index:5;align-self:stretch;width:auto;margin-bottom:14px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:9px;background:#0a0a0a;border:none;border-bottom:1px solid var(--border);color:#777;cursor:pointer;font-family:inherit;font-size:.78rem;overflow:hidden}
+.sidebar-toggle:hover{color:var(--accent)}
+.sidebar-toggle .chev{font-size:.85rem;line-height:1;flex-shrink:0;transition:transform .18s ease}
+.sidebar-toggle .stlabel{display:none;white-space:nowrap}
+.sidebar.expanded .sidebar-toggle{justify-content:flex-start;padding:0 15px}
+.sidebar.expanded .sidebar-toggle .chev{transform:rotate(180deg)}
+.sidebar.expanded .sidebar-toggle .stlabel{display:inline}
+
+.main{flex:1;overflow-y:auto;padding:26px 30px 90px}
+.device-panel{display:none}
+.device-panel.active{display:block}
+.section-panel{display:none}
+.section-panel.active{display:block}
+
+.hero-wrap{margin-bottom:20px}
+.hero{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:22px 26px;display:flex;align-items:center;gap:18px}
+.hero-wrap.detail-open .hero{border-radius:10px 10px 0 0}
+.hero .hi{font-size:2.4rem;flex-shrink:0}
+.hero .ht{flex:1;min-width:0}
+.hero .ht h2{font-size:1.2rem;color:#fff;margin-bottom:4px}
+.hero .ht .sub{font-size:.8rem;color:#888}
+.hero-detail{max-height:0;overflow:hidden;transition:max-height .28s ease;background:var(--card);border:1px solid transparent;border-radius:0 0 10px 10px;margin-top:-1px}
+.hero-wrap.detail-open .hero-detail{max-height:640px;border-color:var(--border)}
+.hero-detail table.kv{margin:16px 22px;width:calc(100% - 44px)}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px}
+.stat-card .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:#777;margin-bottom:6px}
+.stat-card .v{font-size:1.3rem;font-weight:700;color:#fff}
+.stat-card .v small{font-size:.7rem;color:#888;font-weight:400}
+.stat-bar{height:5px;background:#0a0a0a;border-radius:3px;margin-top:8px;overflow:hidden}
+.stat-bar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--orange),var(--accent))}
+
+.lib-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+.lib-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;cursor:pointer;border-color:var(--border)}
+.lib-pill:hover{border-color:var(--fox-dim,#c97417)}
+.lib-pill .li{font-size:1.1rem}
+.lib-pill .lv{font-size:1rem;font-weight:700;color:#fff}
+.lib-pill .lk{font-size:.68rem;color:#888;text-transform:uppercase;letter-spacing:.05em}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.card h3{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:#999;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.empty{color:#666;font-size:.85rem;line-height:1.7;padding:22px 0;text-align:center}
+
+/* Flipper Settings tab controls (task #54) */
+.set-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px 22px}
+.set-field{display:flex;flex-direction:column;gap:7px;font-size:.78rem;color:#999}
+.set-field select{background:var(--dark);border:1px solid var(--border);color:#fff;border-radius:6px;padding:7px 9px;font-size:.82rem;font-family:inherit}
+.set-field input[type=text],.set-field input[type=time],.set-field input[type=password]{background:var(--dark);border:1px solid var(--border);color:#fff;border-radius:6px;padding:7px 9px;font-size:.82rem;font-family:inherit;width:100%;box-sizing:border-box}
+.set-field input[type=text]:focus,.set-field input[type=time]:focus,.set-field input[type=password]:focus{outline:none;border-color:var(--orange)}
+.set-field input[type=text]::placeholder,.set-field input[type=password]::placeholder{color:#666}
+.set-field input[type=time]::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer;opacity:.8}
+.set-field input[type=time]::-webkit-calendar-picker-indicator:hover{opacity:1}
+.set-field input[type=range]{width:100%;accent-color:var(--orange)}
+.set-val{color:#ccc;font-family:var(--mono);font-size:.76rem}
+
+/* "Saved!" pill (task #86) - a brief, center-screen confirmation for
+   settings that now save themselves on change instead of needing their
+   own Apply button (pure select/range cards - see showSavedPill() and
+   autoSaveField() in the Settings tab's JS). Fixed positioning so it
+   floats above the settings body regardless of scroll position; opacity/
+   transform transition for a quick fade+rise rather than an abrupt
+   show/hide, matching this page's already-established preference for
+   soft transitions (e.g. .sidebar's own width transition above). */
+.saved-pill{position:fixed;top:22px;left:50%;transform:translate(-50%,-8px);background:var(--green);color:#04170a;font-weight:600;font-size:.85rem;padding:8px 18px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;z-index:60}
+.saved-pill.show{opacity:1;transform:translate(-50%,0)}
+
+/* Day-of-week toggle chips (Fox Alarm Clock's alarm editor - task #96) */
+.day-chip{border:1px solid var(--border);background:transparent;color:#ccc;font-size:.72rem;padding:5px 10px}
+.day-chip.sel{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+
+/* On/off slider switch (ESP32 Settings' Attacks toggle) */
+.switch-row{display:flex;align-items:center;gap:12px}
+.switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.switch .slider{position:absolute;inset:0;background:var(--dark);border:1px solid var(--border);border-radius:24px;cursor:pointer;transition:.15s}
+.switch .slider:before{content:"";position:absolute;width:18px;height:18px;left:2px;top:2px;background:#888;border-radius:50%;transition:.15s}
+.switch input:checked+.slider{background:#1f4a30;border-color:var(--green)}
+.switch input:checked+.slider:before{background:var(--green);transform:translateX(20px);box-shadow:0 0 6px var(--green)}
+.switch input:disabled+.slider{opacity:.4;cursor:default}
+.switch-label{font-size:.85rem;color:#ccc}
+.empty .big{font-size:1.8rem;display:block;margin-bottom:8px}
+
+.notice{border-radius:6px;padding:12px 16px;margin-bottom:18px;font-size:.84rem;line-height:1.6}
+.notice.warn{background:#1f0a0a;border:1px solid var(--red);color:#e08080}
+.notice.info{background:#0d1a0f;border:1px solid #2a5a35;color:#80c890}
+.notice.ok{background:#0d1a0f;border:1px solid #2a5a35;color:#80c890}
+.notice.show{display:block}
+.notice:not(.show){display:none}
+
+.page-title{font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:4px}
+.page-sub{font-size:.85rem;color:#888;margin-bottom:20px}
+
+/* File Explorer */
+.breadcrumb{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-family:var(--mono);font-size:.8rem;color:#999;margin-bottom:14px}
+.breadcrumb .seg{cursor:pointer;padding:3px 6px;border-radius:4px}
+.breadcrumb .seg:hover{background:var(--card);color:var(--accent)}
+.breadcrumb .sep{color:#555}
+.file-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.file-list{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.file-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:.85rem;cursor:default}
+.file-row:last-child{border-bottom:none}
+.file-row:hover{background:#161616}
+.file-row .fi{font-size:1rem;width:20px;text-align:center;flex-shrink:0}
+.file-row .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.file-row .fn:hover{color:var(--accent)}
+.file-row .fs{color:#777;font-size:.75rem;flex-shrink:0;width:70px;text-align:right}
+.file-row .fa{display:flex;gap:4px;flex-shrink:0}
+.file-row .fa button{background:transparent;border:1px solid var(--border);color:#888;font-size:.7rem;padding:3px 8px;border-radius:4px;cursor:pointer}
+.file-row .fa button:hover{color:var(--accent);border-color:var(--accent)}
+.progress-wrap{margin-top:10px}
+.progress-bar{height:6px;background:#0a0a0a;border-radius:3px;overflow:hidden;border:1px solid var(--border)}
+.progress-bar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--orange),var(--accent));transition:width .1s}
+.progress-txt{font-size:.72rem;color:#888;margin-top:4px;font-family:var(--mono)}
+
+.dl-modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;padding:20px}
+.dl-modal-backdrop.show{display:flex}
+.dl-modal{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:30px 36px;min-width:320px;max-width:420px;width:100%;text-align:center}
+.dl-modal-close{position:absolute;top:8px;right:12px;background:none;border:none;color:#888;font-size:1.4rem;cursor:pointer;line-height:1;padding:4px}
+.dl-modal-close:hover{color:#fff}
+.dl-modal-icon{font-size:2.4rem;margin-bottom:10px}
+.dl-modal-title{font-size:.94rem;color:#eee;margin-bottom:16px;word-break:break-all}
+.dl-modal .progress-bar{height:9px}
+.dl-modal .progress-txt{margin-top:9px;font-size:.8rem;color:#999}
+
+/* Floating back-to-top button - only shown when the page has a vertical
+   scrollbar; sits above the collapsed Device Log bar and clears further
+   when it's expanded. */
+/* z-index kept above .logbar's own (see its comment - bumped to 90) so
+   this still floats on top of the log panel instead of behind it when
+   both are visible. */
+#backTop{position:fixed;bottom:60px;right:24px;width:52px;height:52px;background:var(--orange);color:#fff;font-size:1.5rem;line-height:1;border:none;border-radius:50%;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.45);z-index:95;display:none;align-items:center;justify-content:center;transition:transform .15s ease,filter .15s ease,bottom .15s ease}
+#backTop.show{display:flex}
+#backTop:hover{filter:brightness(1.12);transform:translateY(-2px)}
+/* Was a flat 250px, calibrated for .logbar-body's old fixed 180px cap -
+   now that the cap is 33vh (see .logbar-body), this needs to scale with
+   it too or a tall-enough viewport leaves the open log panel covering
+   this button. ~56px covers the header row + body's own bottom padding +
+   a little breathing room above the panel's top edge. */
+.logbar.open ~ #backTop{bottom:calc(33vh + 56px)}
+
+/* Terminal */
+.term{background:#000;border:1px solid var(--border);border-radius:8px;height:360px;overflow-y:auto;padding:12px 14px;font-family:var(--mono);font-size:.8rem;white-space:pre-wrap;word-break:break-all;color:#c8e8c8;margin-bottom:10px}
+.term-input-row{display:flex;gap:8px}
+.term-input-row input{flex:1;background:var(--card);border:1px solid var(--border);color:#fff;font-family:var(--mono);font-size:.85rem;padding:9px 12px;border-radius:6px}
+.term-input-row input:focus{outline:none;border-color:var(--orange)}
+
+/* Pulse plotter / SubGHz viewer */
+.plot-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.plot-toolbar input[type=file]{font-size:.78rem;color:#aaa}
+#plotCanvas{width:100%;height:220px;background:#080808;border:1px solid var(--border);border-radius:8px;cursor:crosshair;display:block}
+.plot-info{font-family:var(--mono);font-size:.75rem;color:#888;margin-top:8px;display:flex;gap:18px;flex-wrap:wrap}
+
+/* Generic key/value table */
+table.kv{width:100%;border-collapse:collapse;font-size:.82rem}
+table.kv td{padding:6px 8px;border-bottom:1px solid var(--border)}
+table.kv td:first-child{color:#888;width:40%;font-family:var(--mono);font-size:.76rem}
+table.kv td:last-child{color:#eee;word-break:break-all}
+
+/* Command console (ESP32 tabs) */
+.cmd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.cmd-btn{background:var(--card);border:1px solid var(--border);color:#ddd;font-size:.78rem;padding:9px 10px;border-radius:6px;cursor:pointer;text-align:left;font-family:inherit}
+.cmd-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.cmd-btn:disabled{opacity:.35;cursor:not-allowed}
+.cmd-out{background:#000;border:1px solid var(--border);border-radius:8px;height:220px;overflow-y:auto;padding:10px 12px;font-family:var(--mono);font-size:.76rem;white-space:pre-wrap;word-break:break-all;color:#c8e8c8}
+.cmd-input-row{display:flex;gap:8px;margin-top:10px}
+.cmd-input-row input{flex:1;background:var(--card);border:1px solid var(--border);color:#fff;font-family:var(--mono);font-size:.82rem;padding:8px 11px;border-radius:6px}
+.gated-toggle{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#ccc;margin-bottom:14px}
+
+/* Terminal tab (ESP32) - a boot banner (ASCII fox + version, static once
+   printed) above a scrolling live log, reusing .cmd-out/.cmd-input-row for
+   the log/input so it matches every other ESP32 tab's look. Only the log's
+   height differs from the shared .cmd-out default (taller - this tab has
+   no button grid above it eating vertical space) and the banner needs its
+   own <pre> so whitespace/alignment in the ASCII art survives verbatim;
+   overflow-x:auto lets it scroll sideways on narrow screens instead of
+   wrapping and mangling the art. */
+.term-banner{margin:0;padding:14px 16px;background:#000;color:#8fd8a0;font-family:var(--mono);font-size:.72rem;line-height:1.4;overflow-x:auto;white-space:pre}
+.term-out{height:380px}
+
+/* Log console (shared, bottom) */
+/* z-index bumped from 40 (well above the sidebar's own stacking, which
+   isn't explicitly positioned/z-indexed at all - .logbar being
+   position:fixed should already always win that, but this removes any
+   doubt) - real-hardware report, 2026-09-11: sidebar menu items were
+   visibly showing through the log while scrolling. background is set
+   explicitly on .logbar-body too, not just inherited from .logbar's own
+   (background doesn't inherit in CSS - a child with no background of its
+   own just leaves the parent's paint showing through, which should have
+   been fine, but belt-and-suspenders given the report above). */
+.logbar{position:fixed;left:0;right:0;bottom:0;background:#080808;border-top:1px solid var(--border);z-index:90}
+.logbar-head{display:flex;align-items:center;justify-content:space-between;padding:8px 20px;cursor:pointer;font-size:.75rem;color:#999;font-family:var(--mono);background:#080808}
+.logbar-head:hover{color:#ccc}
+/* Capped at 1/3 of the viewport height (was a fixed 180px, which could
+   still run taller than that on a short/mobile-ish window) - scrolls
+   internally past that via overflow-y:auto rather than growing the panel
+   to fit however many log lines exist. */
+.logbar-body{display:none;max-height:33vh;overflow-y:auto;padding:0 20px 12px;font-family:var(--mono);font-size:.74rem;background:#080808}
+.logbar.open .logbar-body{display:block}
+.logbar-body div{padding:2px 0;color:#999;border-bottom:1px solid #151515}
+.logbar-body div.ok{color:var(--green)}
+.logbar-body div.e{color:var(--red)}
+.logbar-body div.w{color:#e8b93c}
+.main{padding-bottom:70px}
+
+@media(max-width:640px){
+  .sidebar{width:54px}
+  .sidebar.expanded{width:170px}
+  .main{padding:18px 14px 90px}
+  .hero{flex-direction:column;text-align:center}
+  /* Too narrow for a 3-column bar with the logo and both pills side by
+     side - stack the pills under the logo, still centered, rather than
+     letting the grid squeeze everything down. */
+  .topbar{grid-template-columns:1fr;row-gap:10px}
+  .tb-right{grid-column:1;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<div class="saved-pill" id="savedPill">Saved!</div>
+
+<header class="topbar">
+  <div class="tb-left">
+    <div class="logo">🦊 <span>FoxFW</span> Lab</div>
+  </div>
+  <div class="tb-right" id="statusRow">
+    <span class="status-pill" id="pillFlipper"><span class="dot"></span><span>Flipper: Not connected</span></span>
+    <span class="status-pill" id="pillEsp32"><span class="dot"></span><span>ESP32: Not connected</span></span>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="sidebar">
+    <button class="sidebar-toggle" id="sidebarToggle" type="button" title="Expand menu" aria-label="Expand menu" aria-expanded="false">
+      <span class="chev">»</span><span class="stlabel">Collapse</span>
+    </button>
+
+    <div class="dev-tabs">
+      <button class="dev-tab active" id="devtab-flipper" data-device="flipper">FLPR</button>
+      <button class="dev-tab" id="devtab-esp32" data-device="esp32">ESP32</button>
+    </div>
+
+    <div class="sec-icons active" id="secicons-flipper" data-device="flipper">
+      <div class="sec-icon active" data-section="dashboard">📊<span class="tip">Dashboard</span></div>
+      <div class="sec-icon" data-section="files">📁<span class="tip">File Explorer</span></div>
+      <div class="sec-icon" data-section="libraries">📚<span class="tip">Libraries</span></div>
+      <div class="sec-icon" data-section="nfc">💳<span class="tip">NFC Tools</span></div>
+      <div class="sec-icon" data-section="paint">🎨<span class="tip">Paint</span></div>
+      <div class="sec-icon" data-section="pulseplotter">〰️<span class="tip">Pulse Plotter</span></div>
+      <div class="sec-icon" data-section="subghz">📈<span class="tip">SubGHz Viewer/Trimmer</span></div>
+      <div class="sec-icon" data-section="settings">⚙️<span class="tip">Settings</span></div>
+    </div>
+
+    <div class="sec-icons" id="secicons-esp32" data-device="esp32">
+      <div class="sec-icon active" data-section="dashboard">📊<span class="tip">Dashboard</span></div>
+      <div class="sec-icon" data-section="terminal">🖥️<span class="tip">Terminal</span></div>
+      <div class="sec-icon" data-section="wifi">📶<span class="tip">WiFi</span></div>
+      <div class="sec-icon" data-section="ble">🔵<span class="tip">BLE</span></div>
+      <div class="sec-icon" data-section="gps">🛰️<span class="tip">GPS</span></div>
+      <div class="sec-icon" data-section="ir">📡<span class="tip">IR</span></div>
+      <div class="sec-icon" data-section="subghz">📻<span class="tip">SubGHz</span></div>
+      <div class="sec-icon" data-section="rfid">🏷️<span class="tip">RFID</span></div>
+      <div class="sec-icon" data-section="settings">⚙️<span class="tip">Settings</span></div>
+    </div>
+
+  </nav>
+
+  <main class="main">
+    <!-- ══════════════════ FLIPPER DEVICE PANEL ══════════════════ -->
+    <div class="device-panel active" id="panel-flipper" data-device="flipper">
+
+      <div class="notice warn" id="flipperCompat"></div>
+
+      <section class="section-panel active" data-section="dashboard">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Connected device overview.</div>
+
+        <div class="hero-wrap" id="heroWrap">
+          <div class="hero">
+            <div class="hi">🐬</div>
+            <div class="ht">
+              <h2 id="flipperName">No Flipper connected</h2>
+              <div class="sub" id="flipperSub">Connecting automatically…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="k">Battery</div>
+            <div class="v" id="statBattery">—<small> %</small></div>
+            <div class="stat-bar"><i id="barBattery" style="width:0%"></i></div>
+          </div>
+          <div class="stat-card">
+            <div class="k">SD Storage</div>
+            <div class="v" id="statSd">—<small> used</small></div>
+            <div class="stat-bar"><i id="barSd" style="width:0%"></i></div>
+          </div>
+          <div class="stat-card">
+            <div class="k">Internal Storage</div>
+            <div class="v" id="statInt">—<small> used</small></div>
+            <div class="stat-bar"><i id="barInt" style="width:0%"></i></div>
+          </div>
+          <div class="stat-card">
+            <div class="k">Firmware</div>
+            <div class="v" id="statFw" style="font-size:1rem">—</div>
+          </div>
+        </div>
+
+        <div class="lib-row" id="dashLibRow">
+          <div class="lib-pill" data-lib="subghz"><span class="li">📻</span><span class="lv" id="libCountSubghz">—</span><span class="lk">SubGHz</span></div>
+          <div class="lib-pill" data-lib="ir"><span class="li">📡</span><span class="lv" id="libCountIr">—</span><span class="lk">Infrared</span></div>
+          <div class="lib-pill" data-lib="nfc"><span class="li">💳</span><span class="lv" id="libCountNfc">—</span><span class="lk">NFC</span></div>
+          <div class="lib-pill" data-lib="lfrfid"><span class="li">🏷️</span><span class="lv" id="libCountRfid">—</span><span class="lk">RFID</span></div>
+          <div class="lib-pill" data-lib="badusb"><span class="li">🔌</span><span class="lv" id="libCountBadusb">—</span><span class="lk">BadUSB</span></div>
+          <div class="lib-pill" data-lib="apps"><span class="li">📦</span><span class="lv" id="libCountApps">—</span><span class="lk">Apps</span></div>
+        </div>
+
+      </section>
+
+      <section class="section-panel" data-section="files">
+        <div class="page-title">File Explorer</div>
+        <div class="page-sub">Browse, upload, download, rename and delete files on /ext and /int.</div>
+        <div id="filesBody"><div class="empty"><span class="big">📁</span>Connect a Flipper to browse its storage.</div></div>
+      </section>
+
+      <section class="section-panel" data-section="libraries">
+        <div class="page-title">Libraries</div>
+        <div class="page-sub">Indexed SubGHz / IR / NFC / RFID / BadUSB files and installed apps.</div>
+        <div id="librariesBody"><div class="empty"><span class="big">📚</span>Connect a Flipper, then click a library pill on the Dashboard or scan below.</div></div>
+      </section>
+
+      <section class="section-panel" data-section="nfc">
+        <div class="page-title">NFC Tools</div>
+        <div class="page-sub">Browse and inspect saved .nfc files on /ext/nfc.</div>
+        <div id="nfcBody"><div class="empty"><span class="big">💳</span>Connect a Flipper to browse its NFC library.</div></div>
+      </section>
+
+      <section class="section-panel" data-section="paint">
+        <div class="page-title">Paint</div>
+        <div class="page-sub">FoxFW's full wallpaper painter, embedded here.</div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <iframe id="paintFrame" data-src="wallpaper-painter.html" style="width:100%;height:900px;border:0;display:block;background:#0c0d10"></iframe>
+        </div>
+        <div class="page-sub" style="margin-top:10px"><a href="wallpaper-painter.html" target="_blank" style="color:var(--accent)">Press CTRL+Click to Open Paint in its own Tab</a></div>
+      </section>
+
+      <!-- Showcase and FAP Compiler used to live here as explanatory
+           notices (both need internet the FoxLAB WiFi network can't
+           provide - see the sec-icons list above, which no longer links to
+           either). Removed outright rather than kept as a dead-end notice
+           page, since neither ever did anything reachable from this AP. -->
+
+      <section class="section-panel" data-section="pulseplotter">
+        <div class="page-title">Pulse Plotter</div>
+        <div class="page-sub">Plot raw pulse timing from a SubGHz (.sub) or Infrared (.ir) capture.</div>
+        <div id="plotterBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="subghz">
+        <div class="page-title">SubGHz Viewer / Trimmer</div>
+        <div class="page-sub">Load a .sub RAW file, view its waveform, trim it, save the result.</div>
+        <div id="subghzViewerBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="settings">
+        <div class="page-title">Settings</div>
+        <div class="page-sub">Device clock, reboot, and FoxFW-specific settings.</div>
+        <div id="settingsBody"><div class="empty"><span class="big">⚙️</span>Connect a Flipper to see its settings.</div></div>
+      </section>
+
+    </div>
+
+    <!-- ══════════════════ ESP32 DEVICE PANEL ══════════════════ -->
+    <div class="device-panel" id="panel-esp32" data-device="esp32">
+
+      <section class="section-panel active" data-section="dashboard">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Connected ESP32 overview.</div>
+
+        <div class="hero-wrap detail-open" id="esp32HeroWrap">
+          <div class="hero">
+            <div class="hi">📡</div>
+            <div class="ht">
+              <h2 id="esp32Name">No ESP32 connected</h2>
+              <div class="sub" id="esp32Sub">Connecting automatically…</div>
+            </div>
+          </div>
+          <!-- Always expanded now (see the "detail-open" class above) rather
+               than gated behind a Detailed View button - on request, since
+               this is the ESP32 panel's only source for the per-build
+               hardware/firmware breakdown below. -->
+          <div class="hero-detail" id="esp32HeroDetail"><table class="kv" id="esp32HeroDetailTable">
+            <tr><td colspan="2" style="color:#666">Connect an ESP32 to see details.</td></tr>
+          </table></div>
+        </div>
+      </section>
+
+      <section class="section-panel" data-section="wifi">
+        <div class="page-title">WiFi</div>
+        <div class="page-sub">Scan, wardrive, sniff, and (once armed) attack.</div>
+        <div id="esp32WifiBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="ble">
+        <div class="page-title">BLE</div>
+        <div class="page-sub">General BLE bridge, tag detection (FINDMY/SMARTTAG/TILE/FLOCK), and (once armed) spam.</div>
+        <div id="esp32BleBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="gps">
+        <div class="page-title">GPS</div>
+        <div class="page-sub">Fix/track readout and POI marking (optional hardware).</div>
+        <div id="esp32GpsBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="ir">
+        <div class="page-title">IR</div>
+        <div class="page-sub">Send, receive, and TV-B-Gone (optional hardware).</div>
+        <div id="esp32IrBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="subghz">
+        <div class="page-title">SubGHz</div>
+        <div class="page-sub">External CC1101-on-ESP32 radio control (optional hardware), independent of the Flipper's own radio.</div>
+        <div id="esp32SubghzBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="rfid">
+        <div class="page-title">RFID</div>
+        <div class="page-sub">PN532 breakout — scan/read/write Mifare (optional hardware).</div>
+        <div id="esp32RfidBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="terminal">
+        <div class="page-title">Terminal</div>
+        <div class="page-sub">A raw line into the Fox ESP32 Firmware's own command dispatcher - same commands the tabs above use.</div>
+        <div id="esp32TerminalBody"></div>
+      </section>
+
+      <section class="section-panel" data-section="settings">
+        <div class="page-title">Settings</div>
+        <div class="page-sub">Fox_ESP32_FW settings, including the attacks-arm toggle.</div>
+        <div id="esp32SettingsBody"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="logbar" id="logbar">
+  <div class="logbar-head" id="logbarHead"><span>▸ Device Log</span><span id="logbarCount"></span></div>
+  <div class="logbar-body" id="logbarBody"></div>
+</div>
+
+<button id="backTop" aria-label="Back to top">↑</button>
+
+<div class="dl-modal-backdrop" id="dlModalBackdrop">
+  <div class="dl-modal">
+    <button class="dl-modal-close" id="dlModalClose" aria-label="Close">×</button>
+    <div class="dl-modal-icon" id="dlModalIcon">⬇️</div>
+    <div class="dl-modal-title" id="dlModalTitle">Downloading…</div>
+    <div class="progress-bar"><i id="dlModalBar"></i></div>
+    <div class="progress-txt" id="dlModalTxt"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  function $(id) { return document.getElementById(id); }
+  const FLIPPER_VID = 0x0483;
+
+  // ── Shared log console ─────────────────────────────────────────────
+  const logbar = $("logbar");
+  const logbarBody = $("logbarBody");
+  const logbarCount = $("logbarCount");
+  let logCount = 0;
+  $("logbarHead").addEventListener("click", () => logbar.classList.toggle("open"));
+  function logLine(msg, cls) {
+    const div = document.createElement("div");
+    if (cls) div.className = cls;
+    const ts = new Date().toLocaleTimeString();
+    div.textContent = `[${ts}] ${msg}`;
+    logbarBody.appendChild(div);
+    logbarBody.scrollTop = logbarBody.scrollHeight;
+    logCount++;
+    logbarCount.textContent = logCount + " entries";
+  }
+
+  // Brief center-screen "Saved!" confirmation for settings that save
+  // themselves on change instead of needing their own Apply button (task
+  // #86) - see autoSaveField()/autoSaveOnSelect() in the Settings tab's
+  // own JS below. A restart on the timer (not just re-adding "show") so
+  // two auto-saves in quick succession each get their own full flash
+  // instead of the second one silently inheriting whatever's left of the
+  // first's fade-out.
+  let savedPillTimer = null;
+  function showSavedPill() {
+    const pill = $("savedPill");
+    pill.classList.add("show");
+    if (savedPillTimer) clearTimeout(savedPillTimer);
+    savedPillTimer = setTimeout(() => pill.classList.remove("show"), 1300);
+  }
+
+  // ── Device/section tab switching ────────────────────────────────────
+  let activeDevice = "flipper";
+  let activeSection = { flipper: "dashboard", esp32: "dashboard" };
+
+  function setDevice(device) {
+    activeDevice = device;
+    document.querySelectorAll(".dev-tab").forEach(el => el.classList.toggle("active", el.dataset.device === device));
+    document.querySelectorAll(".sec-icons").forEach(el => el.classList.toggle("active", el.dataset.device === device));
+    document.querySelectorAll(".device-panel").forEach(el => el.classList.toggle("active", el.dataset.device === device));
+  }
+
+  async function setSection(device, section) {
+    const prevSection = activeSection[device];
+    if (device === "flipper" && prevSection !== section) {
+      await onLeaveFlipperSection(prevSection).catch(e => logLine("Leaving section: " + e.message, "e"));
+    }
+    activeSection[device] = section;
+    const iconRow = $("secicons-" + device);
+    iconRow.querySelectorAll(".sec-icon").forEach(el => el.classList.toggle("active", el.dataset.section === section));
+    const panel = $("panel-" + device);
+    panel.querySelectorAll(".section-panel").forEach(el => el.classList.toggle("active", el.dataset.section === section));
+    if (device === "flipper") {
+      await onEnterFlipperSection(section).catch(e => logLine("Entering section: " + e.message, "e"));
+    }
+  }
+
+  document.querySelectorAll(".dev-tab").forEach(btn => {
+    btn.addEventListener("click", () => { if (!btn.classList.contains("disabled")) setDevice(btn.dataset.device); });
+  });
+  document.querySelectorAll(".sec-icon").forEach(icon => {
+    icon.addEventListener("click", () => {
+      const device = icon.closest(".sec-icons").dataset.device;
+      setSection(device, icon.dataset.section);
+    });
+    // The tooltip is position:fixed (so a scrolling sidebar can't clip it
+    // or grow a phantom scrollbar around it) and so needs its screen
+    // position computed on hover rather than pinned via CSS.
+    const tip = icon.querySelector(".tip");
+    if (tip) {
+      icon.addEventListener("mouseenter", () => {
+        const r = icon.getBoundingClientRect();
+        tip.style.left = (r.right + 10) + "px";
+        tip.style.top = (r.top + r.height / 2) + "px";
+      });
+    }
+  });
+
+  // ── Sidebar expand/collapse ─────────────────────────────────────────
+  // Collapsed (default): icon-only, hover shows a floating tooltip.
+  // Expanded: fixed width, the same label text renders inline instead
+  // (no tooltip needed since it's already visible).
+  const sidebarNav = document.querySelector(".sidebar");
+  const sidebarToggle = $("sidebarToggle");
+  function setSidebarExpanded(expanded) {
+    sidebarNav.classList.toggle("expanded", expanded);
+    sidebarToggle.title = expanded ? "Collapse menu" : "Expand menu";
+    sidebarToggle.setAttribute("aria-label", sidebarToggle.title);
+    sidebarToggle.setAttribute("aria-expanded", String(expanded));
+    try { localStorage.setItem("foxfwLabSidebarExpanded", expanded ? "1" : "0"); } catch (e) {}
+  }
+  sidebarToggle.addEventListener("click", () => setSidebarExpanded(!sidebarNav.classList.contains("expanded")));
+  // No stored preference yet (first-ever visit, or localStorage cleared) ->
+  // default to expanded, not collapsed. localStorage.getItem() returns
+  // null in that case, which `=== "1"` would otherwise silently treat the
+  // same as an explicit "0" (collapsed) - distinguish "never set" from
+  // "set to collapsed" here instead.
+  try {
+    const stored = localStorage.getItem("foxfwLabSidebarExpanded");
+    setSidebarExpanded(stored === null ? true : stored === "1");
+  } catch (e) { setSidebarExpanded(true); }
+
+  // onLeaveFlipperSection/onEnterFlipperSection below used to also tear
+  // down/back up screen streaming and the Terminal's CLI mode as the user
+  // left/entered those two sections (both were mutually exclusive with
+  // everything else on the wire) - both features are gone now (see their
+  // own removal comments further down), so these two hooks currently only
+  // handle the embedded-iframe lazy-load and the File Explorer/NFC Tools
+  // first-visit load. Kept as named hooks rather than inlined at the one
+  // remaining call site in case a future section needs the same pattern.
+
+  // Paint is an embedded <iframe> that lazy-loads from data-src the first
+  // time its section is entered (see below) - this keeps its own script
+  // from ever running before window.foxfwLabFlipper is set, and avoids
+  // fetching the page if the user never visits it. Showcase and FAP
+  // Compiler used to be embedded the same way, then were downgraded to a
+  // plain explanatory notice instead of a broken iframe (both need
+  // internet - community gallery downloads, a cloud build server + GitHub
+  // - that the FoxLAB WiFi network can't provide), and have since been
+  // removed outright rather than kept as a permanent dead end.
+  const embedFrameIds = { paint: "paintFrame" };
+  const embedFramesLoaded = {};
+
+  // The Terminal/CLI tab (and FlipperRPC's old enterCliMode/exitCliMode/
+  // writeCliText/onCliLine) is gone along with the protobuf RPC transport
+  // it was hitched to: it was already only a best-effort reuse of a
+  // generic app-data-exchange message, not a real Flipper OS CLI session,
+  // and the new plain FLPR text protocol (foxr_companion.c) has no
+  // equivalent passthrough at all. Nothing else here depended on it.
+  async function onLeaveFlipperSection(section) {
+    void section; // no per-section teardown left - screen mirror (the one that needed this) is gone, see below
+    if (!flipper.connected) return;
+  }
+  async function onEnterFlipperSection(section) {
+    if (embedFrameIds[section] && !embedFramesLoaded[section]) {
+      embedFramesLoaded[section] = true;
+      const frame = $(embedFrameIds[section]);
+      if (frame) frame.src = frame.dataset.src;
+    }
+    if (!flipper.connected) return;
+    if (section === "files" && !fileExplorerState.loaded) await refreshFileList();
+    if (section === "nfc" && !nfcState.loaded) await refreshNfcList();
+  }
+
+  // ── Flipper Remote client (over WiFi, via FoxLAB's port-82 WebSocket relay) ─
+  //
+  // Was Web Serial + assets/js/flipper-rpc.js talking directly to the
+  // Flipper's native USB/Expansion RPC, then (briefly) a protobuf-over-
+  // binary-WebSocket bridge relaying the real Expansion Protocol 1:1 to a
+  // WebSocket on this same port. Both are gone now: the Flipper side no
+  // longer runs any RPC session or Expansion protocol at all - fox_lab's
+  // FoxLAB Companion (foxr_companion.c) answers plain "[FLPR/...]" text
+  // lines directly over the same AT-command UART [LAB/...] already uses,
+  // and the ESP32's fox_remote.cpp just forwards those lines 1:1 to/from
+  // this WebSocket (see onLabRemoteWsEvent() in fox_lab.cpp) - no framing,
+  // no handshake, no baud switching, nothing protobuf about it.
+  //
+  // Wire format: one command per WebSocket text frame, "[TAG]payload" in
+  // both directions - exactly what esp_at_send()/foxr_companion_dispatch()
+  // use on the Flipper side (see foxr_companion.c). A command's reply tag
+  // is normally "<request tag>/OK" (with any return data as payload) or
+  // "<request tag>/ERR" (payload = a short error code) - FILES/LIST and
+  // FILES/READ/START are the two exceptions, each documented at their own
+  // call below. There's no request/command ID: this whole channel rides
+  // one physical UART with a single Flipper-side dispatch thread handling
+  // one command at a time (esp_at_router.h), so every call this class
+  // makes is queued (_callLock below) rather than raced - matches the
+  // hardware's own one-conversation-at-a-time reality instead of adding a
+  // multiplexing scheme the transport doesn't need. The one unsolicited
+  // push this protocol has is "[FLPR/SCREEN/FRAME]" (screen-mirror
+  // frames), which can arrive at any time a screen stream is active,
+  // interleaved between any other command's request and reply.
+  const FLIPPER_REMOTE_WS_PORT = 82;
+  // fox_lab.cpp's labCmdWsServer (FOX_LAB_CMD_WS_PORT) - the esp32 client
+  // below talks to this, not to a serial port.
+  const ESP32_CMD_WS_PORT = 83;
+
+  // D-pad key ordinals (0-5, see the .dpad markup's data-key values below)
+  // mapped to foxr_companion.c's FLPR/INPUT key names (kFoxrKeys[]).
+  const FLPR_KEY_NAMES = ["UP", "DOWN", "RIGHT", "LEFT", "OK", "BACK"];
+
+  // Plain base64 <-> Uint8Array, built on the browser's own btoa/atob
+  // (which only understand Latin1 "binary strings") rather than pulling in
+  // a library for it - every payload this protocol base64-encodes (file
+  // chunks, screen frames, list item names) is comfortably small (at most
+  // ~1KB raw), so the per-byte loops here are in no way a bottleneck.
+  function b64FromBytes(bytes) {
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function bytesFromB64(b64) {
+    const bin = atob(b64 || "");
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+  function textFromB64(b64) {
+    return new TextDecoder().decode(bytesFromB64(b64));
+  }
+
+  class FlipperRemote {
+    constructor(opts) {
+      this._opts = opts || {};
+      this._ws = null;
+      this._connected = false;
+      this._rxBuf = "";
+      this._pending = null; // the one in-flight call's {onLine, reject}, or null
+      this._callLock = Promise.resolve(); // serializes calls - see header comment
+      this._intentionalDisconnect = false;
+      this._reconnecting = false;
+      this._reconnectGeneration = 0;
+      this._screenStreamActive = false;
+      this._heartbeatTimer = null;
+    }
+
+    get connected() { return this._connected; }
+    get screenStreamActive() { return this._screenStreamActive; }
+
+    // ── Connection lifecycle ──────────────────────────────────────────
+    // Two-stage, deliberately: the WebSocket to the ESP32 opens as soon as
+    // it accepts the TCP connection - that's BEFORE the Flipper is
+    // necessarily even sitting on the FoxLAB Companion screen answering
+    // FLPR commands. A real PING round trip is what actually proves a
+    // Flipper is there and answering, so connect() isn't done until that
+    // succeeds - this is what makes the "Flipper: Connected" status (and
+    // task #8's precondition messaging below) mean what it says, rather
+    // than just "a TCP handshake worked."
+    connect() {
+      if (this._connected) return Promise.resolve();
+      this._intentionalDisconnect = false;
+      return this._connectSequence();
+    }
+
+    async _connectSequence() {
+      await this._openSocket();
+      await this._probeSession();
+      this._connected = true;
+      this._startHeartbeat();
+    }
+
+    // A closed WebSocket fires onclose reliably, but the FoxLAB AP just
+    // disappearing out from under an open browser tab (the user walked
+    // away from it back to their normal WiFi/internet) doesn't necessarily
+    // close the socket at all - TCP has no way to know the link is gone
+    // until something tries to use it, and nothing was trying to. Real-
+    // hardware feedback, 2026-09-11: the status pill stayed "connected"
+    // indefinitely in exactly this situation. A periodic PING gives the
+    // channel something to fail on instead of sitting there looking fine
+    // forever - a failure here force-closes the socket, which hands off to
+    // the exact same onclose → onConnectionLost/_scheduleReconnect path a
+    // real close event already takes, so there's no second code path to
+    // keep in sync.
+    _startHeartbeat() {
+      this._stopHeartbeat();
+      this._heartbeatTimer = setInterval(() => {
+        if (!this._connected || !this._ws) return;
+        this._simpleCall("FLPR/PING", "", { timeoutMs: 5000 }).catch(() => {
+          try { this._ws && this._ws.close(); } catch (e) {}
+        });
+      }, 15000);
+    }
+
+    _stopHeartbeat() {
+      if (this._heartbeatTimer) {
+        clearInterval(this._heartbeatTimer);
+        this._heartbeatTimer = null;
+      }
+    }
+
+    _probeSession() {
+      return this._simpleCall("FLPR/PING", "", { timeoutMs: 7000 }).catch((e) => {
+        try { this._ws && this._ws.close(); } catch (err) {}
+        this._ws = null;
+        // Unlike the old stock-RPC transport, FLPR commands are answered by
+        // the FoxLAB app itself (foxr_companion.c) - the opposite
+        // precondition from before: the Flipper needs to be INSIDE FoxLAB
+        // (not outside every Fox app) for anything to be listening at all.
+        // Reaching this page over WiFi already proves FoxLAB was open
+        // recently enough to start the AP, so a failed ping here almost
+        // always means the app's since been closed or the Flipper's been
+        // power-cycled/unplugged from the ESP32.
+        throw new Error(
+          "Connected to the ESP32, but the Flipper isn't answering FoxLAB Remote requests. Make sure the " +
+          "FoxLAB app is still open on the Flipper (Main Menu → Fox → FoxLAB) - closing it, or the Flipper " +
+          "losing power or its UART connection to the ESP32, stops it from answering these requests."
+        );
+      });
+    }
+
+    _openSocket() {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let ws;
+        try {
+          ws = new WebSocket(`ws://${location.hostname}:${FLIPPER_REMOTE_WS_PORT}/`);
+        } catch (e) {
+          reject(e);
+          return;
+        }
+        this._ws = ws;
+        this._rxBuf = "";
+        this._callLock = Promise.resolve();
+        const connectTimer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try { ws.close(); } catch (e) {}
+          reject(new Error("Timed out reaching the FoxLAB Remote bridge on this ESP32."));
+        }, 8000);
+        ws.onopen = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(connectTimer);
+          resolve();
+        };
+        ws.onerror = () => { /* onclose follows with more useful state */ };
+        ws.onclose = () => {
+          clearTimeout(connectTimer);
+          this._stopHeartbeat();
+          const wasConnected = this._connected;
+          this._connected = false;
+          this._ws = null;
+          this._rejectPending(new Error("Flipper Remote connection closed."));
+          if (!settled) {
+            settled = true;
+            reject(new Error("Couldn't reach the FoxLAB Remote bridge on this ESP32."));
+            return;
+          }
+          if (wasConnected && !this._intentionalDisconnect) {
+            this._opts.onLog?.("Flipper Remote connection lost.", "e");
+            this._opts.onConnectionLost?.();
+            this._scheduleReconnect();
+          }
+        };
+        ws.onmessage = (evt) => this._onWsMessage(evt);
+      });
+    }
+
+    _scheduleReconnect() {
+      if (this._reconnecting || this._intentionalDisconnect) return;
+      this._reconnecting = true;
+      const generation = ++this._reconnectGeneration;
+      const attempt = () => {
+        if (generation !== this._reconnectGeneration || !this._reconnecting) return;
+        this._connectSequence().then(() => {
+          if (generation !== this._reconnectGeneration) return;
+          this._reconnecting = false;
+          this._opts.onReconnected?.();
+        }).catch(() => {
+          setTimeout(attempt, 1500);
+        });
+      };
+      attempt();
+    }
+
+    async disconnect() {
+      this._intentionalDisconnect = true;
+      this._reconnecting = false;
+      this._reconnectGeneration++;
+      this._stopHeartbeat();
+      if (this._screenStreamActive) { try { await this.stopScreenStream(); } catch (e) {} }
+      this._connected = false;
+      // The ESP32 relay (fox_remote.cpp's detachClient()) sends
+      // "[FLPR/SESSION/END]" to the Flipper on its own the moment this
+      // socket actually closes - nothing to send here ourselves.
+      if (this._ws) { try { this._ws.close(); } catch (e) {} }
+      this._ws = null;
+      this._rejectPending(new Error("Disconnected."));
+      this._opts.onLog?.("Flipper disconnected.");
+    }
+
+    _rejectPending(err) {
+      if (this._pending) {
+        const p = this._pending;
+        this._pending = null;
+        try { p.reject(err); } catch (e) {}
+      }
+    }
+
+    // ── Wire framing: one "[TAG]payload" line per WebSocket text frame ──
+    // fox_remote.cpp's forwardToClient() relays exactly one already-
+    // trimmed line (no embedded/trailing '\n') per sendTXT() call - there
+    // is no byte buffering or line-splitting to do here at all, unlike a
+    // raw byte stream. Trimming a stray trailing newline below is
+    // defensive only, in case that relay behavior ever changes.
+    _onWsMessage(evt) {
+      const line = String(evt.data).replace(/\r?\n$/, "");
+      if (line.length) this._onLine(line);
+    }
+
+    _onLine(line) {
+      const close = line.indexOf("]");
+      if (line[0] !== "[" || close < 0) return; // malformed - ignore
+      const tag = line.slice(1, close);
+      const payload = line.slice(close + 1);
+
+      if (tag === "FLPR/SCREEN/FRAME") {
+        this._handleScreenFrame(payload);
+        return;
+      }
+      if (this._pending) {
+        try { this._pending.onLine(tag, payload); } catch (e) {}
+      }
+      // else: a stray line with no call waiting on it (e.g. one last
+      // chunk trickling in just after a timeout already gave up) - safe
+      // to just drop.
+    }
+
+    // Low-level: waits its turn behind any other call already in flight on
+    // this single-conversation-at-a-time channel (see header comment),
+    // sends `wireLine`, then hands every line that arrives while it's
+    // pending to `onLine(tag, payload, resolve, reject)` until that
+    // callback settles it. The timeout resets on every line received, not
+    // just once, so a slow multi-line transfer (a big file, a long
+    // directory) doesn't need one giant fixed budget.
+    _transact(wireLine, onLine, { timeoutMs = 10000 } = {}) {
+      const run = () => new Promise((resolve, reject) => {
+        if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+          reject(new Error("Not connected to the Flipper."));
+          return;
+        }
+        let timer;
+        const entry = {};
+        const finish = (fn, value) => {
+          clearTimeout(timer);
+          if (this._pending === entry) this._pending = null;
+          fn(value);
+        };
+        const resetTimer = () => {
+          clearTimeout(timer);
+          timer = setTimeout(() => finish(reject, new Error("Request timed out.")), timeoutMs);
+        };
+        entry.onLine = (tag, payload) => {
+          resetTimer();
+          onLine(tag, payload, (v) => finish(resolve, v), (e) => finish(reject, e));
+        };
+        // Lets _rejectPending() (WS close, explicit disconnect) tear this
+        // call down from outside the normal onLine flow.
+        entry.reject = (err) => finish(reject, err);
+        this._pending = entry;
+        resetTimer();
+        try {
+          this._ws.send(wireLine);
+        } catch (e) {
+          finish(reject, e);
+        }
+      });
+      const result = this._callLock.then(run, run);
+      this._callLock = result.then(() => {}, () => {});
+      return result;
+    }
+
+    // Generic "<tag>/OK" (resolves with the OK line's payload) / "<tag>/ERR"
+    // (rejects, payload is a short error code) request-reply pair - covers
+    // every FLPR command except FILES/LIST (multi-line - see _listCall) and
+    // FILES/READ/START (irregular follow-up tags - see readFileChunked).
+    _simpleCall(tag, payload = "", opts) {
+      return this._transact(`[${tag}]${payload}`, (rtag, rpayload, resolve, reject) => {
+        if (rtag === tag + "/OK") { resolve(rpayload); return; }
+        if (rtag === tag + "/ERR") { reject(new Error(rpayload || (tag + "/ERR"))); return; }
+        // Anything else seen while this call is pending doesn't belong to
+        // it - the channel is strictly one conversation at a time, so this
+        // shouldn't happen; ignore rather than risk mis-resolving.
+      }, opts);
+    }
+
+    _listCall(tag, payload = "", opts) {
+      const items = [];
+      return this._transact(`[${tag}]${payload}`, (rtag, rpayload, resolve, reject) => {
+        if (rtag === tag + "/ITEM") { items.push(rpayload); return; }
+        if (rtag === tag + "/OK") { resolve(items); return; }
+        if (rtag === tag + "/ERR") { reject(new Error(rpayload || (tag + "/ERR"))); return; }
+      }, opts);
+    }
+
+    // ── Dashboard ────────────────────────────────────────────────────
+    _parseKvPipe(payload) {
+      const info = {};
+      (payload || "").split("|").forEach((kv) => {
+        const idx = kv.indexOf("=");
+        if (idx >= 0) info[kv.slice(0, idx)] = kv.slice(idx + 1);
+      });
+      return info;
+    }
+
+    async getDeviceInfo() {
+      return this._parseKvPipe(await this._simpleCall("FLPR/INFO"));
+    }
+
+    async getPowerInfo() {
+      return this._parseKvPipe(await this._simpleCall("FLPR/POWER"));
+    }
+
+    async getStorageInfo(path) {
+      const payload = await this._simpleCall("FLPR/STORAGE", path);
+      // foxr_companion.c sends KiB (uint32_t) here, not raw bytes - see its
+      // foxr_handle_storage() comment (a real-hardware 64-bit-printf bug:
+      // both storage tiles were always showing 0% used). Multiplied back up
+      // to bytes here so this method's own public contract (and every
+      // caller's math) stays in bytes, unaware the wire units changed.
+      const [totalKb, freeKb] = payload.split(",").map(Number);
+      return { total_space: totalKb * 1024, free_space: freeKb * 1024 };
+    }
+
+    // ── Storage / file explorer ─────────────────────────────────────────
+    // opts.includeMd5 isn't offered by the FLPR protocol (foxr_companion.c
+    // never computes one) - accepted here purely so call sites written
+    // against the old RPC client's signature don't need to change; nothing
+    // downstream currently reads a file's md5sum anyway.
+    async listDir(path, opts = {}) {
+      void opts;
+      const items = await this._listCall("FLPR/FILES/LIST", path);
+      return items.map((payload) => {
+        const parts = payload.split(",");
+        const isDir = parts[0] === "1";
+        const size = Number(parts[1]);
+        const name = textFromB64(parts[2]);
+        return { name, type: isDir ? 1 : 0, size };
+      });
+    }
+
+    async statFile(path) {
+      const payload = await this._simpleCall("FLPR/FILES/STAT", path);
+      const [isDirStr, sizeStr] = payload.split(",");
+      return { name: path.split("/").pop(), type: isDirStr === "1" ? 1 : 0, size: Number(sizeStr) };
+    }
+
+    // No dedicated FLPR "does this exist" command - FLPR/FILES/STAT already
+    // errors for a missing path, so this just turns that into a boolean.
+    // Added for the embedded Wallpaper Painter's SD-card save flow (see
+    // foxlab_src/wallpaper_painter.html), which needs to probe for an
+    // available filename without caring what statFile()'s error actually
+    // was (missing file vs. anything else - either way, "no" is the right
+    // answer for "does this exact name already exist").
+    async fileExists(path) {
+      try {
+        await this.statFile(path);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // FILES/READ/START is the one command whose follow-up lines DON'T
+    // share its own tag as a prefix (foxr_companion.c sends bare
+    // "[FLPR/FILES/READ/CHUNK]"/"[FLPR/FILES/READ/END]"/"[FLPR/FILES/READ/
+    // ERR]" - siblings of READ/START rather than children of it), so this
+    // gets its own hand-written onLine state machine instead of _listCall/
+    // _simpleCall's generic "<tag>/..." matching.
+    readFileChunked(path, onProgress) {
+      const chunks = [];
+      let received = 0;
+      return this._transact(`[FLPR/FILES/READ/START]${path}`, (tag, payload, resolve, reject) => {
+        switch (tag) {
+          case "FLPR/FILES/READ/START/OK":
+            break; // payload is the total size - informational only, onProgress covers the UI
+          case "FLPR/FILES/READ/START/ERR":
+            reject(new Error(payload || tag));
+            break;
+          case "FLPR/FILES/READ/CHUNK": {
+            const bytes = bytesFromB64(payload);
+            chunks.push(bytes);
+            received += bytes.length;
+            try { onProgress?.(received); } catch (e) {}
+            break;
+          }
+          case "FLPR/FILES/READ/END": {
+            const total = new Uint8Array(received);
+            let off = 0;
+            for (const c of chunks) { total.set(c, off); off += c.length; }
+            resolve(total);
+            break;
+          }
+          case "FLPR/FILES/READ/ERR":
+            reject(new Error(payload || tag));
+            break;
+          default:
+            break; // unrelated line - shouldn't happen given strict serialization
+        }
+      }, { timeoutMs: 15000 });
+    }
+
+    async readFileText(path) {
+      const bytes = await this.readFileChunked(path);
+      return new TextDecoder().decode(bytes);
+    }
+
+    // data: a string or a Uint8Array/ArrayBuffer. Sent as WRITE/START, then
+    // one WRITE/CHUNK per (small) chunk, then WRITE/END - three separate
+    // FLPR commands issued in sequence rather than one call with multiple
+    // pushed responses, matching exactly what foxr_companion.c expects
+    // (three distinct dispatched tags - see foxr_handle_files_write_start/
+    // _chunk/_end). CHUNK is 360 raw bytes - matches esp_at.h's
+    // ESP_AT_LINE_MAX budget (360 raw -> 480 b64 chars, documented there)
+    // with room to spare under foxr_companion.c's 400-byte decode buffer.
+    async writeFileChunked(path, data, onProgress) {
+      const bytes = typeof data === "string" ? new TextEncoder().encode(data)
+        : (data instanceof Uint8Array ? data : new Uint8Array(data));
+      const CHUNK = 360;
+      const total = bytes.length;
+      await this._simpleCall("FLPR/FILES/WRITE/START", path, { timeoutMs: 15000 });
+      if (total === 0) {
+        onProgress?.(0, 0);
+      } else {
+        let sent = 0;
+        while (sent < total) {
+          const end = Math.min(sent + CHUNK, total);
+          const b64 = b64FromBytes(bytes.subarray(sent, end));
+          await this._simpleCall("FLPR/FILES/WRITE/CHUNK", b64, { timeoutMs: 15000 });
+          sent = end;
+          onProgress?.(sent, total);
+        }
+      }
+      await this._simpleCall("FLPR/FILES/WRITE/END", "", { timeoutMs: 15000 });
+    }
+
+    async mkdir(path) { await this._simpleCall("FLPR/FILES/MKDIR", path); }
+    async renameFile(oldPath, newPath) { await this._simpleCall("FLPR/FILES/RENAME", oldPath + "|" + newPath); }
+    async deleteFile(path, recursive) {
+      await this._simpleCall("FLPR/FILES/DELETE", (recursive ? "1" : "0") + "," + path);
+    }
+
+    // ── Screen mirror / input ───────────────────────────────────────────
+    async tapInput(key) {
+      const name = FLPR_KEY_NAMES[key];
+      if (!name) throw new Error("Unknown input key: " + key);
+      await this._simpleCall("FLPR/INPUT", `${name},SHORT`);
+    }
+    async startScreenStream() {
+      await this._simpleCall("FLPR/SCREEN/START", "", { timeoutMs: 5000 });
+      this._screenStreamActive = true;
+    }
+    async stopScreenStream() {
+      await this._simpleCall("FLPR/SCREEN/STOP", "", { timeoutMs: 5000 });
+      this._screenStreamActive = false;
+    }
+    _handleScreenFrame(payload) {
+      this._opts.onScreenFrame?.(bytesFromB64(payload));
+    }
+
+    // ── Settings ─────────────────────────────────────────────────────
+    async getDateTime() {
+      const payload = await this._simpleCall("FLPR/DATETIME");
+      const parts = payload.split(",").map(Number);
+      if (parts.length < 7 || parts.some((n) => Number.isNaN(n))) return null;
+      const [year, month, day, hour, minute, second, weekday] = parts;
+      return { year, month, day, hour, minute, second, weekday };
+    }
+    async setDateTime(dt) {
+      const payload = [dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.weekday].join(",");
+      await this._simpleCall("FLPR/DATETIME/SET", payload);
+    }
+    async reboot(mode) {
+      // mode: 0 = normal, 1 = DFU - matches FuriHalRtcBootMode's own
+      // numbering on the Flipper side (foxr_companion.c's foxr_handle_
+      // reboot()), which happens to match this same method's old
+      // protobuf-RPC RebootMode argument, so callers didn't need to change.
+      // The Flipper resets moments after replying and may tear the
+      // connection down before anything else gets through - a short
+      // timeout keeps a successful reboot from sitting on the default
+      // 10s wait just to time out anyway.
+      await this._simpleCall("FLPR/REBOOT", String(mode), { timeoutMs: 3000 });
+    }
+
+    // ── Settings: notification / locale / menu theme (task #54) ───────
+    // Mirrors foxr_companion.c's foxr_handle_settings_get() field order
+    // exactly - see that function's own comment for units (percents, not
+    // 0.0-1.0 floats; ms, not seconds).
+    //
+    // Task #75/#82 extended this to 41 numeric fields plus a trailing
+    // device-name string (42 comma-separated values total) covering Night
+    // Shift, RGB Backlight, Sleep Method/File Naming/Device Name, Input
+    // vibro, Bluetooth, Power, Fox Desktop display, and Fox Alarm globals -
+    // see foxr_handle_settings_get()'s own field-order comment on the
+    // firmware side for the authoritative ordering.
+    async getSettings() {
+      const payload = await this._simpleCall("FLPR/SETTINGS");
+      const parts = payload.split(",");
+      if (parts.length < 42) return null;
+      const nums = parts.slice(0, 41).map(Number);
+      if (nums.some((n) => Number.isNaN(n))) return null;
+      const deviceName = parts.slice(41).join(",");
+      const [contrast, backlightPct, ledPct, volumePct, delayMs, vibro, inversion,
+        timeFormat, dateFormat, units, handOrient, theme,
+        nightShiftIdx, nightShiftStartMin, nightShiftEndMin,
+        rgbInstalled, rgbWhiteMode, rgbLed1, rgbLed2, rgbLed3, rgbEffect, rgbSpeedMs,
+        rgbStep, rgbSaturation, rgbWaveWide,
+        sleepMethod, fileNaming,
+        vibroLevelIdx, vibroTriggerIdx,
+        btEnabled,
+        autoPoweroffIdx, limitChargeIdx,
+        batteryView, showClock, midnightFormat, wifiIconHidden, statusbarIcons, shellColorIdx,
+        alarmKeepBacklight, alarmBeep, alarmVibrate] = nums;
+      return {
+        contrast, backlightPct, ledPct, volumePct, delayMs,
+        vibro: !!vibro, inversion: !!inversion,
+        timeFormat, dateFormat, units, handOrient, theme,
+        nightShiftIdx, nightShiftStartMin, nightShiftEndMin,
+        rgbInstalled: !!rgbInstalled, rgbWhiteMode: !!rgbWhiteMode,
+        rgbLed1, rgbLed2, rgbLed3, rgbEffect, rgbSpeedMs, rgbStep, rgbSaturation, rgbWaveWide,
+        sleepMethod, fileNaming,
+        vibroLevelIdx, vibroTriggerIdx,
+        btEnabled: !!btEnabled,
+        autoPoweroffIdx, limitChargeIdx,
+        batteryView, showClock: !!showClock, midnightFormat,
+        wifiIconHidden: !!wifiIconHidden, statusbarIcons: !!statusbarIcons, shellColorIdx,
+        alarmKeepBacklight: !!alarmKeepBacklight, alarmBeep: !!alarmBeep, alarmVibrate: !!alarmVibrate,
+        deviceName,
+      };
+    }
+    async setNotifSettings(s) {
+      const payload = [
+        s.contrast, s.backlightPct, s.ledPct, s.volumePct, s.delayMs,
+        s.vibro ? 1 : 0, s.inversion ? 1 : 0,
+      ].join(",");
+      await this._simpleCall("FLPR/SETTINGS/NOTIF/SET", payload);
+    }
+    async setLocaleSettings(s) {
+      const payload = [s.timeFormat, s.dateFormat, s.units, s.handOrient].join(",");
+      await this._simpleCall("FLPR/SETTINGS/LOCALE/SET", payload);
+    }
+    async setThemeSettings(theme) {
+      await this._simpleCall("FLPR/SETTINGS/THEME/SET", String(theme));
+    }
+
+    // ── Settings: task #75/#82 additions ───────────────────────────────
+    async setNightShiftSettings(s) {
+      const payload = [s.nightShiftIdx, s.nightShiftStartMin, s.nightShiftEndMin].join(",");
+      await this._simpleCall("FLPR/SETTINGS/NIGHTSHIFT/SET", payload);
+    }
+    // Live color-name lookup (avoids hardcoding the RGB color table here) -
+    // resolves to an array of names; index == on-device color index.
+    async getRgbColors() {
+      const payload = await this._simpleCall("FLPR/SETTINGS/RGB/COLORS");
+      return (payload || "").split("|").filter((n) => n.length > 0);
+    }
+    async setRgbSettings(s) {
+      const payload = [
+        s.rgbInstalled ? 1 : 0, s.rgbWhiteMode ? 1 : 0,
+        s.rgbLed1, s.rgbLed2, s.rgbLed3,
+        s.rgbEffect, s.rgbSpeedMs, s.rgbStep, s.rgbSaturation, s.rgbWaveWide,
+      ].join(",");
+      await this._simpleCall("FLPR/SETTINGS/RGB/SET", payload);
+    }
+    // Resolves to true if this save actually changed the Device Name (and
+    // so still needs a restart to be visible - see foxr_companion.c's
+    // foxr_handle_settings_system_set()), false otherwise. Sleep Method/
+    // File Naming always apply immediately either way; this no longer
+    // reboots the Flipper on its own - see applyDeviceNameBtn's handler
+    // below for what happens with a true result.
+    async setSystemSettings(s) {
+      const payload = `${s.sleepMethod},${s.fileNaming},${s.deviceName || ""}`;
+      const reply = await this._simpleCall("FLPR/SETTINGS/SYSTEM/SET", payload, { timeoutMs: 3000 });
+      return reply === "1";
+    }
+    async setInputSettings(s) {
+      const payload = [s.vibroLevelIdx, s.vibroTriggerIdx].join(",");
+      await this._simpleCall("FLPR/SETTINGS/INPUT/SET", payload);
+    }
+    async setBtSettings(enabled) {
+      await this._simpleCall("FLPR/SETTINGS/BT/SET", enabled ? "1" : "0");
+    }
+    async setPowerSettings(s) {
+      const payload = [s.autoPoweroffIdx, s.limitChargeIdx].join(",");
+      await this._simpleCall("FLPR/SETTINGS/POWER/SET", payload);
+    }
+    async setDesktopSettings(s) {
+      const payload = [
+        s.batteryView, s.showClock ? 1 : 0, s.midnightFormat ? 1 : 0,
+        s.wifiIconHidden ? 1 : 0, s.statusbarIcons ? 1 : 0, s.shellColorIdx,
+      ].join(",");
+      await this._simpleCall("FLPR/SETTINGS/DESKTOP/SET", payload);
+    }
+    async setAlarmSettings(s) {
+      const payload = [
+        s.alarmKeepBacklight ? 1 : 0, s.alarmBeep ? 1 : 0, s.alarmVibrate ? 1 : 0,
+      ].join(",");
+      await this._simpleCall("FLPR/SETTINGS/ALARM/SET", payload);
+    }
+
+    // ── Fox Alarm Clock: individual alarm list (task #96) ───────────────
+    // Full CRUD over the on-device alarm list, alongside the 3 global
+    // toggles above - see foxr_companion.c's own "task #96" section.
+    // Index is always each alarm's position in the on-device list
+    // (0-based), returned by add() and passed back into edit()/remove().
+    async getAlarmList() {
+      const payload = await this._simpleCall("FLPR/SETTINGS/ALARM/LIST");
+      const parts = (payload || "").split("|");
+      const count = Number(parts[0]) || 0;
+      const alarms = [];
+      for (let i = 0; i < count; i++) {
+        const f = (parts[i + 1] || "").split(",").map(Number);
+        if (f.length < 5 || f.some((n) => Number.isNaN(n))) continue;
+        alarms.push({
+          index: i, hour: f[0], minute: f[1], daysMask: f[2],
+          active: !!f[3], recurring: !!f[4],
+        });
+      }
+      return alarms;
+    }
+    // Throws with e.message "FULL" once the list already has
+    // FOX_ALARM_MAX_COUNT (8) alarms. Resolves to the new alarm's index.
+    async addAlarm(a) {
+      const payload = [
+        a.hour, a.minute, a.daysMask, a.active ? 1 : 0, a.recurring ? 1 : 0,
+      ].join(",");
+      const reply = await this._simpleCall("FLPR/SETTINGS/ALARM/ADD", payload);
+      return Number(reply);
+    }
+    async editAlarm(index, a) {
+      const payload = [
+        index, a.hour, a.minute, a.daysMask, a.active ? 1 : 0, a.recurring ? 1 : 0,
+      ].join(",");
+      await this._simpleCall("FLPR/SETTINGS/ALARM/EDIT", payload);
+    }
+    async deleteAlarm(index) {
+      await this._simpleCall("FLPR/SETTINGS/ALARM/DELETE", String(index));
+    }
+
+    // ── Settings: Security & Privacy (task #93) ─────────────────────────
+    // Own GET/SET pair, separate from getSettings()/the SET calls above -
+    // see foxr_companion.c's "Security & Privacy (task #93)" section for
+    // why (PIN changes need current-PIN verification the other 14 fields
+    // don't, so folding this into one big combined command would mean
+    // re-sending/re-checking an unrelated PIN on every toggle flip).
+    async getSecuritySettings() {
+      const payload = await this._simpleCall("FLPR/SETTINGS/SECURITY");
+      const parts = (payload || "").split(",").map(Number);
+      if (parts.length < 15 || parts.some((n) => Number.isNaN(n))) return null;
+      const [pinIsSet, maxAttemptsIdx, exceedAction, onLockEnabled, disconnectBle,
+        disconnectGpio, usbLevel, showTime, showSeconds, showDate, showStatusbar,
+        unlockPrompt, poweroffLocked, autoLockIdx, usbInhibit] = parts;
+      return {
+        pinIsSet: !!pinIsSet, maxAttemptsIdx, exceedAction,
+        onLockEnabled: !!onLockEnabled, disconnectBle: !!disconnectBle,
+        disconnectGpio: !!disconnectGpio, usbLevel,
+        showTime: !!showTime, showSeconds: !!showSeconds, showDate: !!showDate,
+        showStatusbar: !!showStatusbar, unlockPrompt: !!unlockPrompt,
+        poweroffLocked: !!poweroffLocked, autoLockIdx, usbInhibit: !!usbInhibit,
+      };
+    }
+    // The 14 non-PIN fields - same order the GET reply above uses (minus
+    // pinIsSet, which isn't writable here). See setPin()/clearPin() for the
+    // PIN itself.
+    async setSecuritySettings(s) {
+      const payload = [
+        s.maxAttemptsIdx, s.exceedAction,
+        s.onLockEnabled ? 1 : 0, s.disconnectBle ? 1 : 0, s.disconnectGpio ? 1 : 0, s.usbLevel,
+        s.showTime ? 1 : 0, s.showSeconds ? 1 : 0, s.showDate ? 1 : 0, s.showStatusbar ? 1 : 0,
+        s.unlockPrompt ? 1 : 0, s.poweroffLocked ? 1 : 0, s.autoLockIdx, s.usbInhibit ? 1 : 0,
+      ].join(",");
+      await this._simpleCall("FLPR/SETTINGS/SECURITY/SET", payload);
+    }
+    // currentPin is "" for the very first Set PIN (none active yet) - the
+    // firmware only requires/checks it when a PIN is already set, same as
+    // the on-device Change PIN flow. Throws with e.message "WRONGPIN" if
+    // currentPin doesn't match, "AUTHREQUIRED" if it was left blank while a
+    // PIN is active, "INVALID" if newPin isn't 1-10 plain digits.
+    async setPin(currentPin, newPin) {
+      await this._simpleCall(
+        "FLPR/SETTINGS/SECURITY/PIN/SET", `${currentPin || ""},${newPin}`, { timeoutMs: 3000 });
+    }
+    // Throws with e.message "NOTSET" if no PIN is active, "WRONGPIN"/
+    // "AUTHREQUIRED" same as setPin() above.
+    async clearPin(currentPin) {
+      await this._simpleCall(
+        "FLPR/SETTINGS/SECURITY/PIN/CLEAR", currentPin || "", { timeoutMs: 3000 });
+    }
+  }
+  window.FlipperRemote = FlipperRemote;
+
+  // ── Flipper Remote client ────────────────────────────────────────────
+  const flipper = new FlipperRemote({
+    onLog: logLine,
+    // No onScreenFrame handler - the screen mirror UI that used to render
+    // these is gone (see its removal comment further down, past NFC
+    // Tools); _handleScreenFrame()'s `this._opts.onScreenFrame?.(...)`
+    // already no-ops safely without one.
+    onConnectionLost: () => {
+      setPillConnected("flipper", false, "Flipper: Reconnecting…");
+      resetDeviceUi("flipper");
+    },
+    onReconnected: () => {
+      setPillConnected("flipper", true, "Flipper: Connected");
+    },
+  });
+  window.foxfwLabFlipper = flipper;
+
+  function setPillConnected(device, connected, label) {
+    const pill = $(device === "flipper" ? "pillFlipper" : "pillEsp32");
+    pill.classList.toggle("connected", connected);
+    pill.querySelector("span:last-child").textContent = label;
+  }
+
+  // ── ESP32 command client (WebSocket, port 83 - fox_lab.cpp's
+  // labCmdWsServer) ────────────────────────────────────────────────────
+  // Talks the same plain-text AT-command line protocol FoxDispatch has
+  // always used, just over a WebSocket instead of a serial port - every
+  // line a command handler prints arrives as its own complete WS text
+  // frame (FoxWsPrint on the ESP32 side flushes on '\n'), so unlike the
+  // old Web Serial version's readLoop() there's no byte buffering or
+  // line-splitting to do here at all. Public surface (connected/connect/
+  // disconnect/send/onLine/sendAndCollect) is unchanged from the old
+  // serial-backed version on purpose, so none of the ~10 call sites
+  // elsewhere on the page needed to change.
+  const esp32 = {
+    ws: null,
+    connected: false,
+    listeners: [], // (line) => void, called per received line
+    _intentionalDisconnect: false,
+    _reconnecting: false,
+    _reconnectGeneration: 0,
+    _heartbeatTimer: null,
+    _lastActivityAt: 0,
+    // Two-stage, mirroring FlipperRemote: the WebSocket opening only proves
+    // the ESP32's TCP/WS server accepted the connection, not that
+    // FoxDispatch is actually answering behind it. A no-op "AT" probe
+    // (FoxDispatch::handleCommand's own `if (line == "AT") println("OK")`)
+    // is what actually proves the command surface is alive before
+    // connect() resolves.
+    connect() {
+      this._intentionalDisconnect = false;
+      this._reconnectGeneration++;
+      return this._connectSequence();
+    },
+    _connectSequence() {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let ws;
+        try {
+          ws = new WebSocket(`ws://${location.hostname}:${ESP32_CMD_WS_PORT}/`);
+        } catch (e) {
+          reject(e);
+          return;
+        }
+        this.ws = ws;
+        const connectTimer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try { ws.close(); } catch (e) {}
+          reject(new Error("Timed out reaching the ESP32's command channel."));
+        }, 8000);
+        const off = this.onLine((line) => {
+          if (settled || line !== "OK") return;
+          settled = true;
+          clearTimeout(connectTimer);
+          off();
+          this.connected = true;
+          this._lastActivityAt = Date.now();
+          this._startHeartbeat();
+          resolve();
+        });
+        ws.onopen = () => { try { ws.send("AT\n"); } catch (e) {} };
+        ws.onerror = () => { /* onclose follows with more useful state */ };
+        ws.onmessage = (evt) => {
+          this._lastActivityAt = Date.now();
+          String(evt.data).split("\n").forEach(line => {
+            line = line.replace(/\r$/, "");
+            if (line.length) this.listeners.forEach(fn => { try { fn(line); } catch (e) {} });
+          });
+        };
+        ws.onclose = () => {
+          clearTimeout(connectTimer);
+          this._stopHeartbeat();
+          const wasConnected = this.connected;
+          this.connected = false;
+          this.ws = null;
+          off();
+          if (!settled) {
+            settled = true;
+            reject(new Error("Couldn't reach the ESP32's command channel."));
+            return;
+          }
+          if (wasConnected && !this._intentionalDisconnect) {
+            logLine("ESP32 connection lost — waiting for the device to come back...", "e");
+            // Not gated on activeDevice === "esp32" (nor is the pill update
+            // in _scheduleReconnect() below) - the status pills sit in the
+            // persistent topbar, visible regardless of which device tab is
+            // open, so both need to stay accurate even while the Flipper
+            // tab is the one on screen. Found while making this pill
+            // actually reflect real disconnection - see this object's
+            // heartbeat comment further up.
+            setPillConnected("esp32", false, "ESP32: Reconnecting…");
+            resetDeviceUi("esp32");
+            this._scheduleReconnect();
+          }
+        };
+      });
+    },
+    _scheduleReconnect() {
+      if (this._reconnecting || this._intentionalDisconnect) return;
+      this._reconnecting = true;
+      const generation = ++this._reconnectGeneration;
+      const attempt = () => {
+        if (generation !== this._reconnectGeneration || !this._reconnecting) return;
+        this._connectSequence().then(() => {
+          if (generation !== this._reconnectGeneration) return;
+          this._reconnecting = false;
+          logLine("ESP32 reconnected.", "ok");
+          setPillConnected("esp32", true, "ESP32: Connected");
+        }).catch(() => {
+          setTimeout(attempt, 1500);
+        });
+      };
+      attempt();
+    },
+    async send(cmd) {
+      if (!this.connected || !this.ws) return;
+      this.ws.send(cmd + "\n");
+    },
+    onLine(fn) { this.listeners.push(fn); return () => { this.listeners = this.listeners.filter(f => f !== fn); }; },
+    // A closed WebSocket fires onclose reliably, but the FoxLAB AP just
+    // disappearing out from under an open browser tab (the user walked
+    // away from it back to their normal WiFi/internet) doesn't necessarily
+    // close the socket at all - TCP has no way to know the link is gone
+    // until something tries to use it, and nothing was trying to. Real-
+    // hardware feedback, 2026-09-11: the "ESP32: Connected" pill stayed
+    // that way indefinitely in exactly this situation.
+    //
+    // Unlike FlipperRemote's heartbeat (a plain correlated PING call, safe
+    // because that channel serializes one call at a time), this channel
+    // has no request/response correlation at all - `listeners` is a flat
+    // broadcast, every subscriber sees every line, features tell "theirs"
+    // apart by pattern-matching (see makeCmdConsole()). So this doesn't
+    // send its own probe unless the channel's been quiet for a while, and
+    // treats ANY received line - not specifically the "AT" probe's own
+    // "OK" - as proof of life, via _lastActivityAt (updated in onmessage
+    // above): an unsolicited "AT" landing in the middle of some other
+    // command's real output is a harmless extra line for every listener
+    // already built to ignore lines it doesn't recognize, same as this
+    // codebase already tolerates elsewhere (see FlipperRemote's
+    // _simpleCall comment).
+    _startHeartbeat() {
+      this._stopHeartbeat();
+      this._heartbeatTimer = setInterval(() => {
+        if (!this.connected || !this.ws) return;
+        const idleMs = Date.now() - this._lastActivityAt;
+        if (idleMs > 9000) {
+          // Long enough past a probe that a live device should have said
+          // *something* by now - treat the link as gone. Force-closing
+          // hands off to the exact same onclose → _scheduleReconnect path
+          // a real close event already takes, so there's no second code
+          // path to keep in sync.
+          try { this.ws.close(); } catch (e) {}
+        } else if (idleMs > 4000) {
+          try { this.ws.send("AT\n"); } catch (e) {}
+        }
+      }, 3000);
+    },
+    _stopHeartbeat() {
+      if (this._heartbeatTimer) {
+        clearInterval(this._heartbeatTimer);
+        this._heartbeatTimer = null;
+      }
+    },
+    async disconnect() {
+      this._intentionalDisconnect = true;
+      this._reconnecting = false;
+      this._reconnectGeneration++;
+      this._stopHeartbeat();
+      this.connected = false;
+      try { this.ws && this.ws.close(); } catch (e) {}
+      this.ws = null;
+      logLine("ESP32 disconnected.");
+    },
+    // Sends a command, collects lines until a predicate matches (a
+    // "DONE"-style sentinel or an ERROR line), with a timeout. Fox_ESP32_FW's
+    // command/response framing (see FoxESP32_Help.html) is line-oriented
+    // with per-subsystem completion sentinels, not request/response pairs
+    // with IDs, so this is the general shape every command here needs.
+    sendAndCollect(cmd, isDone, timeoutMs = 12000) {
+      return new Promise((resolve, reject) => {
+        const collected = [];
+        const timer = setTimeout(() => { off(); reject(new Error("Timed out waiting for a response.")); }, timeoutMs);
+        const off = this.onLine((line) => {
+          collected.push(line);
+          if (line.startsWith("ERROR")) { clearTimeout(timer); off(); resolve(collected); return; }
+          if (isDone(line)) { clearTimeout(timer); off(); resolve(collected); }
+        });
+        this.send(cmd).catch(e => { clearTimeout(timer); off(); reject(e); });
+      });
+    },
+  };
+
+  // ── Connect flow ─────────────────────────────────────────────────────
+  // Both the ESP32 (port 83) and Flipper (port 82) clients are plain
+  // WebSockets to the same device the browser is already talking to over
+  // WiFi to have loaded this page at all - there's nothing left to "connect"
+  // to in the sense of a browser permission prompt (that was only ever true
+  // of Web Serial/USB), and once connected, either it's on the FoxLAB WiFi
+  // network or it isn't (ESP32) and either the FoxLAB Companion app is open
+  // on the Flipper or it isn't - not states a button can usefully toggle.
+  // So there's no manual Connect/Disconnect button at all: connectDevice()
+  // below is called automatically for both devices at Init time (see the
+  // bottom of this file) the moment the page loads, independently of which
+  // tab is active or which one succeeds first, and retries itself on a
+  // delay if a given attempt fails (e.g. the Flipper's FoxLAB Companion
+  // screen wasn't open yet the moment this page loaded) rather than
+  // needing a manual retry click. Real-hardware feedback, 2026-09-11.
+  async function connectDevice(device) {
+    if (device === "flipper") $("flipperCompat").classList.remove("show"); // clear any stale failure notice from a previous attempt
+    try {
+      if (device === "flipper") {
+        await flipper.connect();
+        setPillConnected("flipper", true, "Flipper: Connected");
+        await onFlipperConnected();
+      } else {
+        await esp32.connect();
+        setPillConnected("esp32", true, "ESP32: Connected");
+        await onEsp32Connected();
+      }
+    } catch (e) {
+      if (e && e.name !== "NotFoundError") {
+        logLine((device === "flipper" ? "Flipper" : "ESP32") + " connect failed: " + e.message, "e");
+        // The Flipper precondition (FoxLAB still open on the device) is
+        // easy to trip and easy to fix, so it gets a persistent, visible
+        // notice here - not just a line in the collapsed log bar.
+        if (device === "flipper") {
+          $("flipperCompat").textContent = e.message;
+          $("flipperCompat").classList.add("show");
+        }
+      }
+      setTimeout(() => connectDevice(device), 3000);
+    }
+  }
+
+  function resetDeviceUi(device) {
+    if (device === "flipper") {
+      $("flipperName").textContent = "No Flipper connected";
+      $("flipperSub").textContent = "Reconnecting automatically. Make sure the FoxLAB app is still open on the Flipper.";
+      fileExplorerState.loaded = false;
+      nfcState.loaded = false;
+      librariesState.scanned = false;
+    } else {
+      $("esp32Name").textContent = "No ESP32 connected";
+      $("esp32Sub").textContent = "Reconnecting automatically.";
+      lastEsp32Info = null;
+      $("esp32HeroDetailTable").innerHTML = '<tr><td colspan="2" style="color:#666">Connect an ESP32 to see details.</td></tr>';
+    }
+  }
+
+  window.addEventListener("beforeunload", () => {
+    if (flipper.connected) flipper.disconnect();
+    if (esp32.connected) esp32.disconnect();
+  });
+
+  // ══════════════════════ FLIPPER: Dashboard ══════════════════════════
+
+  function formatBytes(n) {
+    if (n === undefined || n === null) return "—";
+    n = Number(n);
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
+    return (n / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+  }
+
+  function parseFoxfwVersion(str) {
+    const m = /^foxfw-v(\d+)\.(\d+)\.(\d+)/.exec(str || "");
+    return m ? { major: +m[1], minor: +m[2], patch: +m[3] } : null;
+  }
+  function versionString(v) { return v ? `${v.major}.${v.minor}.${v.patch}` : "unknown"; }
+
+  async function onFlipperConnected() {
+    $("flipperCompat").classList.remove("show");
+    $("flipperName").textContent = "Flipper connected";
+    $("flipperSub").textContent = "Loading device info…";
+    try {
+      const info = await flipper.getDeviceInfo();
+      const v = parseFoxfwVersion(info["firmware_version"]);
+      $("flipperName").textContent = info["hardware_name"] || "Flipper Zero";
+      $("flipperSub").textContent = v ? `FoxFW v${versionString(v)}` : (info["firmware_version"] || "Firmware version unknown");
+      $("statFw").textContent = v ? `v${versionString(v)}` : "unknown";
+      await refreshPowerInfo();
+      await refreshStorageInfo();
+    } catch (e) {
+      logLine("Dashboard load failed: " + e.message, "e");
+      $("flipperSub").textContent = "Connected, but couldn't read device info: " + e.message;
+    }
+    // Kick off a Libraries scan in the background so the Dashboard's
+    // library counts and the Libraries panel are both ready without
+    // making the user visit Libraries first.
+    scanLibraries().catch(e => logLine("Library scan failed: " + e.message, "w"));
+  }
+
+  async function refreshPowerInfo() {
+    try {
+      // Real key is "charge_level" (furi_hal_power_info_get in firmware) -
+      // the others are kept as a fallback in case that ever changes.
+      const power = await flipper.getPowerInfo();
+      const pct = power["charge_level"] ?? power["gauge_charge"] ?? power["charge"] ?? power["battery_charge"];
+      const pctNum = pct !== undefined ? Math.round(parseFloat(pct)) : null;
+      if (pctNum !== null && !Number.isNaN(pctNum)) {
+        $("statBattery").innerHTML = pctNum + "<small> %</small>";
+        $("barBattery").style.width = Math.min(100, Math.max(0, pctNum)) + "%";
+      } else {
+        $("statBattery").innerHTML = "?<small> %</small>";
+        logLine("Power info: no charge_level field in the device's response.", "w");
+      }
+    } catch (e) {
+      $("statBattery").innerHTML = "?<small> %</small>";
+      logLine("Power info: " + e.message, "w");
+    }
+  }
+
+  async function refreshStorageInfo() {
+    try {
+      const ext = await flipper.getStorageInfo("/ext");
+      if (ext) {
+        const total = Number(ext.total_space), free = Number(ext.free_space);
+        const usedPct = total > 0 ? Math.round(((total - free) / total) * 100) : 0;
+        $("statSd").innerHTML = usedPct + "<small> % used</small>";
+        $("barSd").style.width = usedPct + "%";
+      } else {
+        $("statSd").innerHTML = "?<small> used</small>";
+      }
+    } catch (e) {
+      $("statSd").innerHTML = "?<small> used</small>";
+      logLine("SD storage info: " + e.message, "w");
+    }
+    try {
+      const int_ = await flipper.getStorageInfo("/int");
+      if (int_) {
+        const total = Number(int_.total_space), free = Number(int_.free_space);
+        const usedPct = total > 0 ? Math.round(((total - free) / total) * 100) : 0;
+        $("statInt").innerHTML = usedPct + "<small> % used</small>";
+        $("barInt").style.width = usedPct + "%";
+      } else {
+        $("statInt").innerHTML = "?<small> used</small>";
+      }
+    } catch (e) {
+      $("statInt").innerHTML = "?<small> used</small>";
+      logLine("Internal storage info: " + e.message, "w");
+    }
+  }
+
+  // ══════════════════════ FLIPPER: Libraries ══════════════════════════
+
+  const LIB_DIRS = {
+    subghz: "/ext/subghz",
+    ir: "/ext/infrared",
+    nfc: "/ext/nfc",
+    lfrfid: "/ext/lfrfid",
+    badusb: "/ext/badusb",
+    apps: "/ext/apps",
+  };
+  const LIB_EXT = { subghz: ".sub", ir: ".ir", nfc: ".nfc", lfrfid: ".rfid", badusb: ".txt", apps: ".fap" };
+
+  const librariesState = { scanned: false, counts: {}, files: {} };
+
+  // Recursively lists a directory over RPC, one storage_list_request per
+  // folder (there's no recursive-list request in storage.proto) - fine for
+  // a background scan, just needs to not be called on every tab switch.
+  async function listRecursive(path, extFilter, depthLeft = 6) {
+    let results = [];
+    let entries;
+    try {
+      entries = await flipper.listDir(path);
+    } catch (e) {
+      return results;
+    }
+    for (const f of entries) {
+      const full = path + "/" + f.name;
+      if (f.type === 1) {
+        if (depthLeft > 0) results = results.concat(await listRecursive(full, extFilter, depthLeft - 1));
+      } else if (!extFilter || f.name.toLowerCase().endsWith(extFilter)) {
+        results.push({ path: full, name: f.name, size: f.size });
+      }
+    }
+    return results;
+  }
+
+  async function scanLibraries() {
+    if (!flipper.connected) return;
+    for (const key of Object.keys(LIB_DIRS)) {
+      try {
+        const files = await listRecursive(LIB_DIRS[key], LIB_EXT[key]);
+        librariesState.files[key] = files;
+        librariesState.counts[key] = files.length;
+      } catch (e) {
+        librariesState.counts[key] = 0;
+      }
+    }
+    librariesState.scanned = true;
+    $("libCountSubghz").textContent = librariesState.counts.subghz ?? "—";
+    $("libCountIr").textContent = librariesState.counts.ir ?? "—";
+    $("libCountNfc").textContent = librariesState.counts.nfc ?? "—";
+    $("libCountRfid").textContent = librariesState.counts.lfrfid ?? "—";
+    $("libCountBadusb").textContent = librariesState.counts.badusb ?? "—";
+    $("libCountApps").textContent = librariesState.counts.apps ?? "—";
+    renderLibrariesPanel();
+  }
+
+  function renderLibrariesPanel(filterKey) {
+    const body = $("librariesBody");
+    if (!librariesState.scanned) {
+      body.innerHTML = '<div class="empty"><span class="big">📚</span>Scanning…</div>';
+      return;
+    }
+    const keys = filterKey ? [filterKey] : Object.keys(LIB_DIRS);
+    let html = "";
+    for (const key of keys) {
+      const files = librariesState.files[key] || [];
+      html += `<div class="card"><h3>${key.toUpperCase()} <span style="color:#666;font-weight:400">${files.length} file(s)</span></h3>`;
+      if (!files.length) {
+        html += '<div class="empty">Nothing found.</div>';
+      } else {
+        html += '<div class="file-list">' + files.slice(0, 300).map(f =>
+          `<div class="file-row" data-path="${f.path}"><span class="fi">📄</span><span class="fn" title="Click to download ${f.path}">${f.path}</span><span class="fs">${formatBytes(f.size)}</span><span class="fa"><button data-act="dl">⬇</button></span></div>`
+        ).join("") + "</div>";
+        if (files.length > 300) html += `<div class="empty">…and ${files.length - 300} more.</div>`;
+      }
+      html += "</div>";
+    }
+    body.innerHTML = html;
+    body.querySelectorAll(".file-row").forEach(row => {
+      const path = row.dataset.path;
+      row.querySelector(".fn").addEventListener("click", () => downloadFile(path));
+      row.querySelector('[data-act="dl"]').addEventListener("click", (e) => { e.stopPropagation(); downloadFile(path); });
+    });
+  }
+
+  document.querySelectorAll(".lib-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      setSection("flipper", "libraries").then(() => renderLibrariesPanel(pill.dataset.lib));
+    });
+  });
+
+  // ══════════════════════ FLIPPER: File Explorer ══════════════════════
+
+  const fileExplorerState = { loaded: false, path: "/ext", entries: [] };
+
+  function renderBreadcrumb(path) {
+    const parts = path.split("/").filter(Boolean);
+    let acc = "";
+    let html = '<span class="seg" data-path="/">/</span>';
+    for (const p of parts) {
+      acc += "/" + p;
+      html += `<span class="sep">›</span><span class="seg" data-path="${acc}">${p}</span>`;
+    }
+    return html;
+  }
+
+  async function refreshFileList() {
+    fileExplorerState.loaded = true;
+    const body = $("filesBody");
+    body.innerHTML = `
+      <div class="breadcrumb" id="fileBreadcrumb"></div>
+      <div class="file-toolbar">
+        <button class="bsm" id="fileNewFolderBtn">📁 New folder</button>
+        <label class="bsm" style="cursor:pointer">⬆ Upload<input type="file" id="fileUploadInput" style="display:none"></label>
+        <button class="bsm" id="fileRefreshBtn">↻ Refresh</button>
+      </div>
+      <div class="file-list" id="fileListEl"><div class="empty">Loading…</div></div>
+      <div class="progress-wrap" id="fileProgressWrap" style="display:none">
+        <div class="progress-bar"><i id="fileProgressBar"></i></div>
+        <div class="progress-txt" id="fileProgressTxt"></div>
+      </div>`;
+    $("fileNewFolderBtn").addEventListener("click", onNewFolder);
+    $("fileUploadInput").addEventListener("change", onUploadFile);
+    $("fileRefreshBtn").addEventListener("click", () => loadFileDir(fileExplorerState.path));
+    await loadFileDir(fileExplorerState.path);
+  }
+
+  async function loadFileDir(path) {
+    fileExplorerState.path = path;
+    $("fileBreadcrumb").innerHTML = renderBreadcrumb(path);
+    $("fileBreadcrumb").querySelectorAll(".seg").forEach(seg => {
+      seg.addEventListener("click", () => loadFileDir(seg.dataset.path));
+    });
+    const listEl = $("fileListEl");
+    listEl.innerHTML = '<div class="empty">Loading…</div>';
+    try {
+      const entries = await flipper.listDir(path, { includeMd5: false });
+      entries.sort((a, b) => (b.type - a.type) || a.name.localeCompare(b.name));
+      fileExplorerState.entries = entries;
+      if (!entries.length) {
+        listEl.innerHTML = '<div class="empty">Empty folder.</div>';
+        return;
+      }
+      listEl.innerHTML = entries.map(f => {
+        const isDir = f.type === 1;
+        const full = (path === "/" ? "" : path) + "/" + f.name;
+        return `<div class="file-row" data-path="${full}" data-dir="${isDir ? 1 : 0}">
+          <span class="fi">${isDir ? "📁" : "📄"}</span>
+          <span class="fn">${f.name}</span>
+          <span class="fs">${isDir ? "" : formatBytes(f.size)}</span>
+          <span class="fa">
+            ${isDir ? "" : '<button data-act="dl">⬇</button>'}
+            <button data-act="ren">✎</button>
+            <button data-act="del">🗑</button>
+          </span>
+        </div>`;
+      }).join("");
+      listEl.querySelectorAll(".file-row").forEach(row => {
+        const full = row.dataset.path;
+        const isDir = row.dataset.dir === "1";
+        row.querySelector(".fn").addEventListener("click", () => {
+          if (isDir) loadFileDir(full);
+        });
+        const dlBtn = row.querySelector('[data-act="dl"]');
+        if (dlBtn) dlBtn.addEventListener("click", (e) => { e.stopPropagation(); downloadFile(full); });
+        row.querySelector('[data-act="ren"]').addEventListener("click", (e) => { e.stopPropagation(); renameEntry(full); });
+        row.querySelector('[data-act="del"]').addEventListener("click", (e) => { e.stopPropagation(); deleteEntry(full, isDir); });
+      });
+    } catch (e) {
+      listEl.innerHTML = '<div class="empty">Couldn\'t list this folder: ' + e.message + '</div>';
+    }
+  }
+
+  // ── Download progress popup (file transfers over the serial link can
+  // take a while, so the user gets a big visible progress bar rather than
+  // wondering if anything is happening) ──────────────────────────────────
+  const dlModal = { backdrop: $("dlModalBackdrop"), icon: $("dlModalIcon"), title: $("dlModalTitle"), bar: $("dlModalBar"), txt: $("dlModalTxt") };
+  $("dlModalClose").addEventListener("click", () => dlModal.backdrop.classList.remove("show"));
+  function showDownloadModal(name) {
+    dlModal.icon.textContent = "⬇️";
+    dlModal.title.textContent = "Downloading " + name + "…";
+    dlModal.bar.style.width = "0%";
+    dlModal.txt.textContent = "";
+    dlModal.backdrop.classList.add("show");
+  }
+  function updateDownloadModal(received, total) {
+    const pct = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0;
+    dlModal.bar.style.width = pct + "%";
+    dlModal.txt.textContent = total > 0
+      ? formatBytes(received) + " / " + formatBytes(total) + " (" + pct + "%)"
+      : formatBytes(received) + " downloaded…";
+  }
+
+  async function downloadFile(path) {
+    const name = path.split("/").pop();
+    showDownloadModal(name);
+    try {
+      logLine("Downloading " + path + "…");
+      let total = 0;
+      try { const stat = await flipper.statFile(path); if (stat) total = stat.size; } catch (e) { /* progress is best-effort */ }
+      const bytes = await flipper.readFileChunked(path, (received) => updateDownloadModal(received, total));
+      updateDownloadModal(bytes.length, bytes.length || total);
+      const blob = new Blob([bytes]);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      logLine("Downloaded " + path, "ok");
+      dlModal.icon.textContent = "✅";
+      dlModal.title.textContent = "Downloaded " + name;
+      setTimeout(() => dlModal.backdrop.classList.remove("show"), 600);
+    } catch (e) {
+      logLine("Download failed: " + e.message, "e");
+      dlModal.icon.textContent = "⚠️";
+      dlModal.title.textContent = "Download failed";
+      dlModal.txt.textContent = e.message;
+    }
+  }
+
+  async function onUploadFile(evt) {
+    const file = evt.target.files[0];
+    if (!file) return;
+    const targetPath = (fileExplorerState.path === "/" ? "" : fileExplorerState.path) + "/" + file.name;
+    const progWrap = $("fileProgressWrap");
+    progWrap.style.display = "block";
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      await flipper.writeFileChunked(targetPath, buf, (sent, total) => {
+        $("fileProgressBar").style.width = Math.round((sent / total) * 100) + "%";
+        $("fileProgressTxt").textContent = `Uploading ${file.name}… (${sent}/${total})`;
+      });
+      logLine("Uploaded " + targetPath, "ok");
+    } catch (e) {
+      logLine("Upload failed: " + e.message, "e");
+    }
+    progWrap.style.display = "none";
+    evt.target.value = "";
+    await loadFileDir(fileExplorerState.path);
+  }
+
+  async function onNewFolder() {
+    const name = prompt("New folder name:");
+    if (!name) return;
+    const path = (fileExplorerState.path === "/" ? "" : fileExplorerState.path) + "/" + name;
+    try {
+      await flipper.mkdir(path);
+      logLine("Created " + path, "ok");
+    } catch (e) {
+      logLine("mkdir failed: " + e.message, "e");
+    }
+    await loadFileDir(fileExplorerState.path);
+  }
+
+  async function renameEntry(path) {
+    const oldName = path.split("/").pop();
+    const newName = prompt("Rename to:", oldName);
+    if (!newName || newName === oldName) return;
+    const newPath = path.slice(0, path.length - oldName.length) + newName;
+    try {
+      await flipper.renameFile(path, newPath);
+      logLine("Renamed to " + newPath, "ok");
+    } catch (e) {
+      logLine("Rename failed: " + e.message, "e");
+    }
+    await loadFileDir(fileExplorerState.path);
+  }
+
+  async function deleteEntry(path, isDir) {
+    if (!confirm(`Delete ${path}?${isDir ? " (and everything inside it)" : ""}`)) return;
+    try {
+      await flipper.deleteFile(path, isDir);
+      logLine("Deleted " + path, "ok");
+    } catch (e) {
+      logLine("Delete failed: " + e.message, "e");
+    }
+    await loadFileDir(fileExplorerState.path);
+  }
+
+  // Screen mirror lived here (canvas render + D-pad input over
+  // FLPR/SCREEN/START/STOP + FLPR/INPUT) - removed 2026-09-11. Reasoning:
+  // FoxLAB itself only exists while the Flipper's FoxLAB Companion screen
+  // is open (see flpr_view.c's "Keep this app open"), so the only thing
+  // this could ever mirror was that same static screen - not a generally
+  // useful live-mirror the way it would be if the Flipper were free to
+  // navigate elsewhere. FlipperRemote's tapInput()/startScreenStream()/
+  // stopScreenStream()/_handleScreenFrame()/screenStreamActive (this D-pad
+  // was their only caller) and foxr_companion.c's FLPR/INPUT and
+  // FLPR/SCREEN/* companion-side commands were all left in place rather
+  // than ripped out - dead but harmless infrastructure, same call this
+  // project already made for the old protobufjs vendor markers (see
+  // gen_foxlab_page.js) - in case a real future use for device input or a
+  // live mirror shows up (e.g. once/if the Companion can run without
+  // occupying the whole screen).
+
+  // ══════════════════════ FLIPPER: NFC Tools ══════════════════════════
+
+  const nfcState = { loaded: false, files: [] };
+
+  async function refreshNfcList() {
+    nfcState.loaded = true;
+    const body = $("nfcBody");
+    body.innerHTML = '<div class="empty">Scanning /ext/nfc…</div>';
+    try {
+      const files = librariesState.files.nfc || await listRecursive(LIB_DIRS.nfc, LIB_EXT.nfc);
+      nfcState.files = files;
+      if (!files.length) {
+        body.innerHTML = '<div class="empty"><span class="big">💳</span>No .nfc files found on /ext/nfc.</div>';
+        return;
+      }
+      body.innerHTML = '<div class="file-list" id="nfcListEl">' + files.map(f =>
+        `<div class="file-row"><span class="fi">💳</span><span class="fn" data-path="${f.path}">${f.name}</span><span class="fs">${formatBytes(f.size)}</span></div>`
+      ).join("") + '</div><div class="card" id="nfcDetailCard" style="display:none"><h3>Details</h3><table class="kv" id="nfcDetailTable"></table></div>';
+      body.querySelectorAll(".fn").forEach(el => {
+        el.addEventListener("click", () => showNfcDetail(el.dataset.path));
+      });
+    } catch (e) {
+      body.innerHTML = '<div class="empty">Couldn\'t list /ext/nfc: ' + e.message + '</div>';
+    }
+  }
+
+  // Flipper's .nfc save format is FlipperFormat text: "Key: Value" lines,
+  // "#"-prefixed comments. No live-scan RPC exists for NFC (not in this
+  // firmware's bundled proto set), so this is browse-and-parse only, same
+  // as lab.flipper.net's own NFC tools scope for a saved-card view.
+  function parseFlipperFormat(text) {
+    const kv = {};
+    text.split("\n").forEach(line => {
+      line = line.trim();
+      if (!line || line.startsWith("#")) return;
+      const idx = line.indexOf(":");
+      if (idx < 0) return;
+      kv[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    });
+    return kv;
+  }
+
+  async function showNfcDetail(path) {
+    const card = $("nfcDetailCard");
+    const table = $("nfcDetailTable");
+    card.style.display = "block";
+    table.innerHTML = "<tr><td>Loading…</td><td></td></tr>";
+    try {
+      const text = await flipper.readFileText(path);
+      const kv = parseFlipperFormat(text);
+      if (Object.keys(kv).length) {
+        table.innerHTML = Object.keys(kv).map(k => `<tr><td>${k}</td><td>${kv[k]}</td></tr>`).join("");
+      } else {
+        // Not every file under /ext/nfc is Key: Value formatted (e.g. a
+        // Mifare Classic dictionary is a flat list of hex keys) - show the
+        // raw contents instead of a dead-end "No fields found."
+        table.innerHTML = `<tr><td colspan="2">Not a Key: Value formatted file — showing raw contents:</td></tr>
+          <tr><td colspan="2"><pre style="white-space:pre-wrap;word-break:break-all;font-size:.76rem;max-height:300px;overflow-y:auto;margin:0">${text.slice(0, 20000)}</pre></td></tr>`;
+      }
+    } catch (e) {
+      table.innerHTML = `<tr><td>Error</td><td>${e.message}</td></tr>`;
+    }
+  }
+
+  // ══════════════════════ FLIPPER: Pulse Plotter + SubGHz Viewer ══════
+  //
+  // Both panels plot the same shape of data - a sequence of signed
+  // microsecond durations, positive = mark/high, negative = space/low -
+  // so they share one renderer. Pulse Plotter is read-only across .sub
+  // and .ir RAW captures (lab.flipper.net's own scope per its forum/help
+  // text: a raw pulse plotter for SubGHz/IR/RFID). SubGHz Viewer/Trimmer
+  // adds trim range selection + export + save-back-to-device, scoped to
+  // .sub only, mirroring https://siroxcw.github.io/Flipper-SubGHz-Viewer-Trimmer/
+  // (client-side, file-based, no device needed - reimplemented rather than
+  // copied since only its README/behavior was reviewed, not its source).
+
+  function parseSubRaw(text) {
+    const meta = {};
+    let durations = null;
+    text.split("\n").forEach(line => {
+      line = line.trim();
+      if (!line) return;
+      if (line.startsWith("RAW_Data:")) {
+        const nums = line.slice(9).trim().split(/\s+/).map(Number).filter(n => !Number.isNaN(n));
+        durations = durations ? durations.concat(nums) : nums;
+        return;
+      }
+      const idx = line.indexOf(":");
+      if (idx > 0) meta[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    });
+    return { meta, durations: durations || [] };
+  }
+
+  function parseIrRaw(text) {
+    // .ir files can hold several signal blocks; this plots the first
+    // "type: raw" block found - IR raw data is unsigned, alternating
+    // mark/space starting with a mark, unlike .sub's already-signed values.
+    const lines = text.split("\n").map(l => l.trim());
+    let inBlock = false, isRaw = false, name = "";
+    const meta = {};
+    for (const line of lines) {
+      if (line.startsWith("name:")) { name = line.slice(5).trim(); inBlock = true; isRaw = false; }
+      if (inBlock && line.startsWith("type:")) isRaw = line.includes("raw");
+      if (inBlock && isRaw && line.startsWith("data:")) {
+        const unsigned = line.slice(5).trim().split(/\s+/).map(Number).filter(n => !Number.isNaN(n));
+        const durations = unsigned.map((n, i) => (i % 2 === 0 ? n : -n));
+        meta["name"] = name;
+        return { meta, durations };
+      }
+    }
+    return { meta: { name }, durations: [] };
+  }
+
+  function buildSubText(meta, durations) {
+    const lines = [
+      "Filetype: Flipper SubGhz RAW File",
+      "Version: 1",
+      "Frequency: " + (meta["Frequency"] || "433920000"),
+      "Preset: " + (meta["Preset"] || "FuriHalSubGhzPresetOok650Async"),
+      "Protocol: RAW",
+      "RAW_Data: " + durations.join(" "),
+    ];
+    return lines.join("\n") + "\n";
+  }
+
+  function makePlotter(containerId, opts) {
+    const trimmable = !!opts.trim;
+    const el = $(containerId);
+    el.innerHTML = `
+      <div class="plot-toolbar">
+        <input type="file" id="${containerId}File" accept="${opts.accept}">
+        <span id="${containerId}Status" style="color:#888;font-size:.8rem"></span>
+        ${trimmable ? `<button class="bsm sm" id="${containerId}TrimBtn" disabled>Set trim from selection</button>
+        <button class="bsm sm" id="${containerId}ExportBtn" disabled>Export trimmed .sub</button>
+        <button class="bsm sm" id="${containerId}SaveBtn" disabled>Save to device</button>` : ""}
+      </div>
+      <canvas id="${containerId}Canvas"></canvas>
+      <div class="plot-info" id="${containerId}Info"></div>`;
+
+    const canvas = $(containerId + "Canvas");
+    const ctx = canvas.getContext("2d");
+    let durations = [];
+    let meta = {};
+    let viewStart = 0, viewEnd = 0; // index range into durations currently visible
+    let selStart = null, selEnd = null; // pixel-drag selection, in duration-index space
+    let sourceName = "";
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(300, rect.width) * (window.devicePixelRatio || 1);
+      canvas.height = 220 * (window.devicePixelRatio || 1);
+      draw();
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    function totalDurationUs() { return durations.reduce((a, b) => a + Math.abs(b), 0); }
+
+    function draw() {
+      const w = canvas.width, h = canvas.height;
+      ctx.fillStyle = "#080808";
+      ctx.fillRect(0, 0, w, h);
+      if (!durations.length) return;
+      const visible = durations.slice(viewStart, viewEnd || durations.length);
+      const total = visible.reduce((a, b) => a + Math.abs(b), 0) || 1;
+      const midY = h / 2;
+      const amp = h * 0.32;
+      ctx.strokeStyle = "#e8750a";
+      ctx.lineWidth = Math.max(1, window.devicePixelRatio || 1);
+      ctx.beginPath();
+      let x = 0;
+      let y = midY - amp; // start high (first duration is a mark)
+      ctx.moveTo(0, y);
+      for (const d of visible) {
+        const segW = (Math.abs(d) / total) * w;
+        ctx.lineTo(x + segW, y);
+        const newY = d >= 0 ? midY - amp : midY + amp;
+        ctx.lineTo(x + segW, newY);
+        x += segW;
+        y = newY;
+      }
+      ctx.stroke();
+
+      if (selStart !== null && selEnd !== null) {
+        const s = Math.min(selStart, selEnd), e = Math.max(selStart, selEnd);
+        ctx.fillStyle = "rgba(255,154,60,0.18)";
+        ctx.fillRect(s, 0, e - s, h);
+      }
+    }
+
+    function updateInfo() {
+      const info = $(containerId + "Info");
+      const parts = [];
+      if (sourceName) parts.push("File: " + sourceName);
+      parts.push("Pulses: " + durations.length);
+      parts.push("Duration: " + (totalDurationUs() / 1000).toFixed(1) + " ms");
+      if (meta["Frequency"]) parts.push("Freq: " + (parseInt(meta["Frequency"], 10) / 1e6).toFixed(3) + " MHz");
+      if (meta["Preset"]) parts.push("Preset: " + meta["Preset"]);
+      info.textContent = parts.join("   ·   ");
+    }
+
+    function loadParsed(parsed, name) {
+      meta = parsed.meta;
+      durations = parsed.durations;
+      sourceName = name;
+      viewStart = 0; viewEnd = durations.length;
+      selStart = selEnd = null;
+      $(containerId + "Status").textContent = durations.length ? "" : "No RAW pulse data found in this file.";
+      if (trimmable) {
+        $(containerId + "ExportBtn").disabled = !durations.length;
+        $(containerId + "SaveBtn").disabled = !durations.length || !flipper.connected;
+      }
+      resizeCanvas();
+      updateInfo();
+    }
+
+    $(containerId + "File").addEventListener("change", async (evt) => {
+      const file = evt.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const isIr = /\.ir$/i.test(file.name) || /Filetype:\s*IR/i.test(text);
+      const parsed = isIr ? parseIrRaw(text) : parseSubRaw(text);
+      loadParsed(parsed, file.name);
+    });
+
+    if (trimmable) {
+      let dragging = false;
+      canvas.addEventListener("mousedown", (e) => {
+        dragging = true;
+        selStart = (e.offsetX) * (window.devicePixelRatio || 1);
+        selEnd = selStart;
+      });
+      canvas.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        selEnd = (e.offsetX) * (window.devicePixelRatio || 1);
+        draw();
+      });
+      window.addEventListener("mouseup", () => {
+        if (!dragging) return;
+        dragging = false;
+        $(containerId + "TrimBtn").disabled = selStart === null || Math.abs(selEnd - selStart) < 4;
+      });
+
+      $(containerId + "TrimBtn").addEventListener("click", () => {
+        if (selStart === null) return;
+        const w = canvas.width;
+        const total = totalDurationUs() || 1;
+        const s = Math.min(selStart, selEnd) / w, e = Math.max(selStart, selEnd) / w;
+        // Map pixel fractions back to duration-array indices by walking
+        // cumulative time, same mapping draw() used to place each pulse.
+        let acc = 0, startIdx = 0, endIdx = durations.length;
+        for (let i = 0; i < durations.length; i++) {
+          const frac = acc / total;
+          if (frac <= s) startIdx = i;
+          if (frac <= e) endIdx = i + 1;
+          acc += Math.abs(durations[i]);
+        }
+        viewStart = startIdx; viewEnd = endIdx;
+        selStart = selEnd = null;
+        $(containerId + "TrimBtn").disabled = true;
+        draw();
+        updateInfo();
+      });
+
+      $(containerId + "ExportBtn").addEventListener("click", () => {
+        const trimmed = durations.slice(viewStart, viewEnd || durations.length);
+        const text = buildSubText(meta, trimmed);
+        const blob = new Blob([text], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = (sourceName ? sourceName.replace(/\.(sub|ir)$/i, "") : "trimmed") + "_trimmed.sub";
+        a.click();
+      });
+
+      $(containerId + "SaveBtn").addEventListener("click", async () => {
+        if (!flipper.connected) { alert("Connect a Flipper first."); return; }
+        const trimmed = durations.slice(viewStart, viewEnd || durations.length);
+        const text = buildSubText(meta, trimmed);
+        const name = prompt("Save as (in /ext/subghz):", (sourceName || "trimmed").replace(/\.(sub|ir)$/i, "") + "_trimmed.sub");
+        if (!name) return;
+        try {
+          await flipper.writeFileChunked("/ext/subghz/" + name, text);
+          logLine("Saved /ext/subghz/" + name, "ok");
+        } catch (e) {
+          logLine("Save to device failed: " + e.message, "e");
+        }
+      });
+    }
+
+    return { resizeCanvas };
+  }
+
+  let plotterInited = false, subghzViewerInited = false;
+  function ensurePlotterUi() {
+    if (plotterInited) return;
+    plotterInited = true;
+    makePlotter("plotterBody", { accept: ".sub,.ir", trim: false });
+  }
+  function ensureSubghzViewerUi() {
+    if (subghzViewerInited) return;
+    subghzViewerInited = true;
+    makePlotter("subghzViewerBody", { accept: ".sub", trim: true });
+  }
+
+  // ══════════════════════ FLIPPER: Settings ═══════════════════════════
+
+  async function renderFlipperSettings() {
+    const body = $("settingsBody");
+    if (!flipper.connected) {
+      body.innerHTML = '<div class="empty"><span class="big">⚙️</span>Connect a Flipper to see its settings.</div>';
+      return;
+    }
+    body.innerHTML = `
+      <div class="card">
+        <h3>Reboot</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="bsm" id="rebootOsBtn">Reboot</button>
+          <button class="bsm" id="rebootDfuBtn">Reboot to DFU</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Clock</h3>
+        <div id="clockRow" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span id="deviceClockTxt" style="font-family:var(--mono);color:#ccc">reading…</span>
+          <button class="bsm" id="syncClockBtn">Sync to this computer's time</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Device Name</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Device Name <span class="set-val" id="setDeviceNameVal"></span></span>
+            <input type="text" id="setDeviceName" placeholder="(default hardware name)" maxlength="24" pattern="[A-Za-z0-9]*">
+          </div>
+        </div>
+        <p style="color:#999;font-size:.85em;margin:10px 0 0">
+          Letters and numbers only, leave blank to reset to the default name. A Device Name
+          change is saved right away but only takes effect on your Flipper's next reboot -
+          closing the FoxLAB app afterward offers the choice to restart right away instead.
+        </p>
+        <button class="bsm pri" id="applyDeviceNameBtn" style="margin-top:16px">Apply</button>
+      </div>
+      <div class="card">
+        <h3>Security &amp; Privacy</h3>
+        <div id="pinLockStatus" style="margin-bottom:14px;color:#ccc;font-size:.85rem"></div>
+        <div id="pinSetFields" class="set-grid" style="display:none">
+          <div class="set-field">
+            <span>New PIN</span>
+            <input type="password" id="setPinNew" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="1-10 digits" autocomplete="off">
+          </div>
+          <div class="set-field">
+            <span>Confirm New PIN</span>
+            <input type="password" id="setPinConfirm" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="repeat PIN" autocomplete="off">
+          </div>
+        </div>
+        <div id="pinCurrentField" class="set-grid" style="display:none;margin-top:12px">
+          <div class="set-field">
+            <span>Current PIN</span>
+            <input type="password" id="setPinCurrent" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="required to change or remove" autocomplete="off">
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="bsm pri" id="setPinBtn" style="display:none">Set PIN</button>
+          <button class="bsm pri" id="changePinBtn" style="display:none">Change PIN</button>
+          <button class="bsm" id="removePinBtn" style="display:none">Remove PIN</button>
+        </div>
+        <div class="set-grid" style="margin-top:20px">
+          <div class="set-field">
+            <span>MAX Attempts</span>
+            <select id="setMaxAttempts">
+              <option value="0">No Limit</option>
+              <option value="1">3</option>
+              <option value="2">4</option>
+              <option value="3">5</option>
+              <option value="4">6</option>
+              <option value="5">7</option>
+              <option value="6">8</option>
+              <option value="7">9</option>
+              <option value="8">10</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>On Exceed</span>
+            <select id="setOnExceed"><option value="0">Lock only</option><option value="1">Format SD</option></select>
+          </div>
+          <div class="set-field">
+            <span>Poweroff While Locked</span>
+            <select id="setPoweroffLocked"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>Auto Lock Timer</span>
+            <select id="setAutoLock">
+              <option value="0">OFF</option>
+              <option value="1">10s</option>
+              <option value="2">15s</option>
+              <option value="3">30s</option>
+              <option value="4">60s</option>
+              <option value="5">90s</option>
+              <option value="6">2min</option>
+              <option value="7">5min</option>
+              <option value="8">10min</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>USB: No AutoLock</span>
+            <select id="setUsbNoAutoLock"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Advanced Security</h3>
+        <p style="color:#999;font-size:.85em;margin:0 0 12px">
+          These only take effect while a PIN is set and the device is locked.
+        </p>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>On Lock</span>
+            <select id="setOnLockEnabled"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>BLE</span>
+            <select id="setDisconnectBle"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>GPIO</span>
+            <select id="setDisconnectGpio"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>USB</span>
+            <select id="setUsbLevel">
+              <option value="0">Minimal</option>
+              <option value="1">CLI + RPC</option>
+              <option value="2">Full Disconnect</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Lock Screen Display</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Show Time</span>
+            <select id="setLockShowTime"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>Show Seconds</span>
+            <select id="setLockShowSeconds"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>Show Date</span>
+            <select id="setLockShowDate"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>Show Statusbar</span>
+            <select id="setLockShowStatusbar"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>Unlock Prompt</span>
+            <select id="setLockUnlockPrompt"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Menu Theme</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Style</span>
+            <select id="setTheme">
+              <option value="0">Classic</option>
+              <option value="1">Fox Theme</option>
+              <option value="2">Carousel</option>
+              <option value="3">Slider</option>
+              <option value="4">Tiny</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Display &amp; Sound</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>LCD Contrast <span class="set-val" id="setContrastVal"></span></span>
+            <input type="range" id="setContrast" min="-8" max="8" step="1">
+          </div>
+          <div class="set-field">
+            <span>Backlight <span class="set-val" id="setBacklightVal"></span></span>
+            <input type="range" id="setBacklight" min="0" max="100" step="1">
+          </div>
+          <div class="set-field">
+            <span>LED Brightness <span class="set-val" id="setLedVal"></span></span>
+            <input type="range" id="setLed" min="0" max="100" step="1">
+          </div>
+          <div class="set-field">
+            <span>Speaker Volume <span class="set-val" id="setVolumeVal"></span></span>
+            <input type="range" id="setVolume" min="0" max="100" step="1">
+          </div>
+          <div class="set-field">
+            <span>Backlight Time</span>
+            <select id="setDelay">
+              <option value="0">Always ON</option>
+              <option value="2000">2s</option>
+              <option value="5000">5s</option>
+              <option value="10000">10s</option>
+              <option value="15000">15s</option>
+              <option value="30000">30s</option>
+              <option value="60000">60s</option>
+              <option value="90000">90s</option>
+              <option value="120000">120s</option>
+              <option value="300000">5min</option>
+              <option value="600000">10min</option>
+              <option value="1800000">30min</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>Vibration</span>
+            <select id="setVibro"><option value="1">On</option><option value="0">Off</option></select>
+          </div>
+          <div class="set-field">
+            <span>LCD Inversion</span>
+            <select id="setInversion"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Desktop Display</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Battery View</span>
+            <select id="setBatteryView">
+              <option value="0">Bar</option>
+              <option value="1">%</option>
+              <option value="2">Inverted %</option>
+              <option value="3">Retro 3</option>
+              <option value="4">Retro 5</option>
+              <option value="5">Bar %</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>Show Clock</span>
+            <select id="setShowClock"><option value="1">On</option><option value="0">Off</option></select>
+          </div>
+          <div class="set-field">
+            <span>Midnight Format</span>
+            <select id="setMidnightFmt"><option value="0">Show "12"</option><option value="1">Show "0"</option></select>
+          </div>
+          <div class="set-field">
+            <span>WiFi/CC1101 Icon</span>
+            <select id="setWifiIcon"><option value="0">On</option><option value="1">Off</option></select>
+          </div>
+          <div class="set-field">
+            <span>Battery &amp; SD Icons</span>
+            <select id="setStatusbarIcons"><option value="1">On</option><option value="0">Off</option></select>
+          </div>
+          <div class="set-field">
+            <span>Shell Color</span>
+            <select id="setShellColor">
+              <option value="0">Orange</option>
+              <option value="1">Red</option>
+              <option value="2">Green</option>
+              <option value="3">Yellow</option>
+              <option value="4">Blue</option>
+              <option value="5">Magenta</option>
+              <option value="6">Cyan</option>
+              <option value="7">White</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>RGB Backlight</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>RGB Backlight Installed</span>
+            <select id="setRgbInstalled"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>White Backlight</span>
+            <select id="setRgbWhiteMode"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>LED 1 Color</span>
+            <select id="setRgbLed1"></select>
+          </div>
+          <div class="set-field">
+            <span>LED 2 Color</span>
+            <select id="setRgbLed2"></select>
+          </div>
+          <div class="set-field">
+            <span>LED 3 Color</span>
+            <select id="setRgbLed3"></select>
+          </div>
+          <div class="set-field">
+            <span>Effects</span>
+            <select id="setRgbEffect"><option value="0">Off</option><option value="1">Rainbow</option><option value="2">Wave</option></select>
+          </div>
+          <div class="set-field">
+            <span>Effect Speed</span>
+            <select id="setRgbSpeed">
+              <option value="100">0.1s</option>
+              <option value="200">0.2s</option>
+              <option value="300">0.3s</option>
+              <option value="400">0.4s</option>
+              <option value="500">0.5s</option>
+              <option value="600">0.6s</option>
+              <option value="700">0.7s</option>
+              <option value="800">0.8s</option>
+              <option value="900">0.9s</option>
+              <option value="1000">1s</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>Color Step</span>
+            <select id="setRgbStep"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+          </div>
+          <div class="set-field">
+            <span>Saturation <span class="set-val" id="setRgbSaturationVal"></span></span>
+            <input type="range" id="setRgbSaturation" min="1" max="255" step="1">
+          </div>
+          <div class="set-field">
+            <span>Wave Width</span>
+            <select id="setRgbWaveWide"><option value="30">1</option><option value="40">2</option><option value="50">3</option></select>
+          </div>
+        </div>
+        <p style="color:#999;font-size:.85em;margin:10px 0 0">
+          Only relevant on Flippers with the RGB backlight hardware mod installed.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Locale &amp; Input</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Time Format</span>
+            <select id="setTimeFmt"><option value="0">24-hour</option><option value="1">12-hour</option></select>
+          </div>
+          <div class="set-field">
+            <span>Date Format</span>
+            <select id="setDateFmt"><option value="0">Day/Month/Year</option><option value="1">Month/Day/Year</option><option value="2">Year/Month/Day</option></select>
+          </div>
+          <div class="set-field">
+            <span>Units</span>
+            <select id="setUnits"><option value="0">Metric</option><option value="1">Imperial</option></select>
+          </div>
+          <div class="set-field">
+            <span>Hand Orientation</span>
+            <select id="setHand"><option value="0">Right-handed</option><option value="1">Left-handed</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>System</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Sleep Method</span>
+            <select id="setSleepMethod"><option value="0">Default</option><option value="1">Legacy</option></select>
+          </div>
+          <div class="set-field">
+            <span>File Naming</span>
+            <select id="setFileNaming"><option value="0">Default</option><option value="1">Detailed</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Notifications</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Buttons Vibro</span>
+            <select id="setVibroLevel">
+              <option value="0">Off</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>Vibro Trigger</span>
+            <select id="setVibroTrigger"><option value="0">Press</option><option value="1">Release</option><option value="2">Both</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Night Shift</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Night Shift</span>
+            <select id="setNightShift">
+              <option value="0">Off</option>
+              <option value="1">-10%</option>
+              <option value="2">-20%</option>
+              <option value="3">-30%</option>
+              <option value="4">-40%</option>
+              <option value="5">-50%</option>
+              <option value="6">-60%</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>Start</span>
+            <input type="time" id="setNightShiftStart">
+          </div>
+          <div class="set-field">
+            <span>End</span>
+            <input type="time" id="setNightShiftEnd">
+          </div>
+        </div>
+        <button class="bsm pri" id="applyNightShiftBtn" style="margin-top:16px">Apply</button>
+      </div>
+      <div class="card">
+        <h3>Fox Alarm Clock</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Keep Backlight On</span>
+            <select id="setAlarmBacklight"><option value="0">Off</option><option value="1">On</option></select>
+          </div>
+          <div class="set-field">
+            <span>Alarm Beep</span>
+            <select id="setAlarmBeep"><option value="1">On</option><option value="0">Off</option></select>
+          </div>
+          <div class="set-field">
+            <span>Alarm Vibrate</span>
+            <select id="setAlarmVibrate"><option value="1">On</option><option value="0">Off</option></select>
+          </div>
+        </div>
+        <h4 style="margin:20px 0 10px;font-size:.8rem;color:#999;text-transform:uppercase;letter-spacing:.04em">Alarms</h4>
+        <div id="alarmListBody"></div>
+        <button class="bsm pri" id="addAlarmBtn" style="margin-top:12px">+ Add Alarm</button>
+        <div id="alarmEditor" style="display:none;margin-top:16px;padding:14px;background:var(--dark);border:1px solid var(--border);border-radius:8px">
+          <div class="set-grid">
+            <div class="set-field">
+              <span>Time</span>
+              <input type="time" id="alarmEditTime">
+            </div>
+            <div class="set-field">
+              <span>Active</span>
+              <select id="alarmEditActive"><option value="1">On</option><option value="0">Off</option></select>
+            </div>
+            <div class="set-field">
+              <span>Repeat</span>
+              <select id="alarmEditRecurring"><option value="1">Weekly on selected days</option><option value="0">Once</option></select>
+            </div>
+          </div>
+          <div id="alarmEditDays" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px"></div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="bsm pri" id="alarmEditSaveBtn">Add Alarm</button>
+            <button class="bsm" id="alarmEditCancelBtn">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Power</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Auto PowerOff</span>
+            <select id="setAutoPoweroff">
+              <option value="0">Off</option>
+              <option value="1">5 min</option>
+              <option value="2">10 min</option>
+              <option value="3">15 min</option>
+              <option value="4">30 min</option>
+              <option value="5">45 min</option>
+              <option value="6">60 min</option>
+              <option value="7">90 min</option>
+            </select>
+          </div>
+          <div class="set-field">
+            <span>Limit Charge</span>
+            <select id="setLimitCharge">
+              <option value="0">Off</option>
+              <option value="1">90%</option>
+              <option value="2">85%</option>
+              <option value="3">80%</option>
+              <option value="4">75%</option>
+              <option value="5">70%</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Bluetooth</h3>
+        <div class="set-grid">
+          <div class="set-field">
+            <span>Bluetooth</span>
+            <select id="setBtEnabled"><option value="1">On</option><option value="0">Off</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="notice warn" id="settingsUnavailableNotice">
+        Couldn't read the current settings from the device - the controls above may not match
+        what's actually set. Reopen this tab to retry, or double-check before saving.
+      </div>`;
+
+    try {
+      const dt = await flipper.getDateTime();
+      if (dt) $("deviceClockTxt").textContent = `${String(dt.day).padStart(2, "0")}/${String(dt.month).padStart(2, "0")}/${dt.year} ${String(dt.hour).padStart(2, "0")}:${String(dt.minute).padStart(2, "0")}:${String(dt.second).padStart(2, "0")}`;
+    } catch (e) { $("deviceClockTxt").textContent = "unavailable"; }
+    $("syncClockBtn").addEventListener("click", async () => {
+      const now = new Date();
+      try {
+        await flipper.setDateTime({
+          hour: now.getHours(), minute: now.getMinutes(), second: now.getSeconds(),
+          day: now.getDate(), month: now.getMonth() + 1, year: now.getFullYear(),
+          weekday: now.getDay() === 0 ? 7 : now.getDay(),
+        });
+        logLine("Clock synced.", "ok");
+        renderFlipperSettings();
+      } catch (e) { logLine("Clock sync failed: " + e.message, "e"); }
+    });
+    $("rebootOsBtn").addEventListener("click", () => { if (confirm("Reboot the Flipper?")) flipper.reboot(0).catch(e => logLine(e.message, "e")); });
+    $("rebootDfuBtn").addEventListener("click", () => { if (confirm("Reboot into DFU mode? You'll need to reboot again manually to leave it.")) flipper.reboot(1).catch(e => logLine(e.message, "e")); });
+
+    // ── Settings: notification / locale / menu theme (task #54) ────────
+    const rangeIds = ["setContrast", "setBacklight", "setLed", "setVolume"];
+    rangeIds.forEach((id) => {
+      $(id).addEventListener("input", () => {
+        const suffix = id === "setContrast" ? "" : "%";
+        $(id + "Val").textContent = $(id).value + suffix;
+      });
+    });
+    $("setRgbSaturation").addEventListener("input", () => {
+      $("setRgbSaturationVal").textContent = $("setRgbSaturation").value;
+    });
+    try {
+      const s = await flipper.getSettings();
+      if (!s) throw new Error("no settings payload");
+      $("setContrast").value = s.contrast;
+      $("setBacklight").value = s.backlightPct;
+      $("setLed").value = s.ledPct;
+      $("setVolume").value = s.volumePct;
+      rangeIds.forEach((id) => $(id).dispatchEvent(new Event("input")));
+      $("setDelay").value = String(s.delayMs);
+      $("setVibro").value = s.vibro ? "1" : "0";
+      $("setInversion").value = s.inversion ? "1" : "0";
+      $("setTimeFmt").value = String(s.timeFormat);
+      $("setDateFmt").value = String(s.dateFormat);
+      $("setUnits").value = String(s.units);
+      $("setHand").value = String(s.handOrient);
+      $("setTheme").value = String(s.theme);
+
+      // ── Fox Desktop display (task #75/#82) ──────────────────────────
+      $("setBatteryView").value = String(s.batteryView);
+      $("setShowClock").value = s.showClock ? "1" : "0";
+      $("setMidnightFmt").value = s.midnightFormat ? "1" : "0";
+      $("setWifiIcon").value = s.wifiIconHidden ? "1" : "0";
+      $("setStatusbarIcons").value = s.statusbarIcons ? "1" : "0";
+      $("setShellColor").value = String(s.shellColorIdx);
+
+      // ── Fox Alarm Clock globals ──────────────────────────────────────
+      $("setAlarmBacklight").value = s.alarmKeepBacklight ? "1" : "0";
+      $("setAlarmBeep").value = s.alarmBeep ? "1" : "0";
+      $("setAlarmVibrate").value = s.alarmVibrate ? "1" : "0";
+
+      // ── Night Shift - minutes-since-midnight <-> "HH:MM" ─────────────
+      const minToTime = (m) =>
+        `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+      $("setNightShift").value = String(s.nightShiftIdx);
+      $("setNightShiftStart").value = minToTime(s.nightShiftStartMin);
+      $("setNightShiftEnd").value = minToTime(s.nightShiftEndMin);
+
+      // ── RGB Backlight ─────────────────────────────────────────────────
+      $("setRgbInstalled").value = s.rgbInstalled ? "1" : "0";
+      $("setRgbWhiteMode").value = s.rgbWhiteMode ? "1" : "0";
+      $("setRgbEffect").value = String(s.rgbEffect);
+      $("setRgbSpeed").value = String(s.rgbSpeedMs);
+      $("setRgbStep").value = String(s.rgbStep);
+      $("setRgbSaturation").value = String(s.rgbSaturation);
+      $("setRgbSaturationVal").textContent = String(s.rgbSaturation);
+      $("setRgbWaveWide").value = String(s.rgbWaveWide);
+      // LED color selects are populated from the device's own live color
+      // table (getRgbColors()) rather than a hardcoded list here, so this
+      // page can't drift out of sync with the firmware's color set.
+      try {
+        const colors = await flipper.getRgbColors();
+        ["setRgbLed1", "setRgbLed2", "setRgbLed3"].forEach((id) => {
+          $(id).innerHTML = colors.map((name, idx) => `<option value="${idx}">${name}</option>`).join("");
+        });
+        $("setRgbLed1").value = String(s.rgbLed1);
+        $("setRgbLed2").value = String(s.rgbLed2);
+        $("setRgbLed3").value = String(s.rgbLed3);
+      } catch (e) {
+        // Leave the LED selects empty - the rest of the RGB card (and its
+        // Apply button) still works fine without the color name list.
+      }
+
+      // ── Power ─────────────────────────────────────────────────────────
+      $("setAutoPoweroff").value = String(s.autoPoweroffIdx);
+      $("setLimitCharge").value = String(s.limitChargeIdx);
+
+      // ── Bluetooth ─────────────────────────────────────────────────────
+      $("setBtEnabled").value = s.btEnabled ? "1" : "0";
+
+      // ── System ────────────────────────────────────────────────────────
+      $("setSleepMethod").value = String(s.sleepMethod);
+      $("setFileNaming").value = String(s.fileNaming);
+      $("setDeviceName").value = s.deviceName || "";
+
+      // ── Input ─────────────────────────────────────────────────────────
+      $("setVibroLevel").value = String(s.vibroLevelIdx);
+      $("setVibroTrigger").value = String(s.vibroTriggerIdx);
+    } catch (e) {
+      $("settingsUnavailableNotice").classList.add("show");
+    }
+
+    // ── Security & Privacy (task #93) ───────────────────────────────────
+    // Separate GET from the big one above - see getSecuritySettings()'s own
+    // comment for why.
+    function updatePinUi(pinIsSet) {
+      $("pinLockStatus").textContent = pinIsSet
+        ? "A PIN is currently set on this device."
+        : "No PIN is currently set on this device.";
+      $("setPinBtn").style.display = pinIsSet ? "none" : "";
+      $("changePinBtn").style.display = pinIsSet ? "" : "none";
+      $("removePinBtn").style.display = pinIsSet ? "" : "none";
+      $("pinSetFields").style.display = "";
+      $("pinCurrentField").style.display = pinIsSet ? "" : "none";
+      $("setPinNew").value = "";
+      $("setPinConfirm").value = "";
+      $("setPinCurrent").value = "";
+    }
+    function collectSecurityPayload() {
+      return {
+        maxAttemptsIdx: Number($("setMaxAttempts").value),
+        exceedAction: Number($("setOnExceed").value),
+        onLockEnabled: $("setOnLockEnabled").value === "1",
+        disconnectBle: $("setDisconnectBle").value === "1",
+        disconnectGpio: $("setDisconnectGpio").value === "1",
+        usbLevel: Number($("setUsbLevel").value),
+        showTime: $("setLockShowTime").value === "1",
+        showSeconds: $("setLockShowSeconds").value === "1",
+        showDate: $("setLockShowDate").value === "1",
+        showStatusbar: $("setLockShowStatusbar").value === "1",
+        unlockPrompt: $("setLockUnlockPrompt").value === "1",
+        poweroffLocked: $("setPoweroffLocked").value === "1",
+        autoLockIdx: Number($("setAutoLock").value),
+        usbInhibit: $("setUsbNoAutoLock").value === "1",
+      };
+    }
+    function pinErrorMessage(e) {
+      const map = {
+        WRONGPIN: "Current PIN is incorrect.",
+        AUTHREQUIRED: "Enter the current PIN first.",
+        NOTSET: "No PIN is currently set.",
+        INVALID: "PIN must be 1-10 digits.",
+      };
+      return map[e.message] || e.message;
+    }
+    let lastOnExceedValue = "0";
+    try {
+      const sec = await flipper.getSecuritySettings();
+      if (!sec) throw new Error("no security settings payload");
+      $("setMaxAttempts").value = String(sec.maxAttemptsIdx);
+      $("setOnExceed").value = sec.exceedAction ? "1" : "0";
+      $("setPoweroffLocked").value = sec.poweroffLocked ? "1" : "0";
+      $("setAutoLock").value = String(sec.autoLockIdx);
+      $("setUsbNoAutoLock").value = sec.usbInhibit ? "1" : "0";
+      $("setOnLockEnabled").value = sec.onLockEnabled ? "1" : "0";
+      $("setDisconnectBle").value = sec.disconnectBle ? "1" : "0";
+      $("setDisconnectGpio").value = sec.disconnectGpio ? "1" : "0";
+      $("setUsbLevel").value = String(sec.usbLevel);
+      $("setLockShowTime").value = sec.showTime ? "1" : "0";
+      $("setLockShowSeconds").value = sec.showSeconds ? "1" : "0";
+      $("setLockShowDate").value = sec.showDate ? "1" : "0";
+      $("setLockShowStatusbar").value = sec.showStatusbar ? "1" : "0";
+      $("setLockUnlockPrompt").value = sec.unlockPrompt ? "1" : "0";
+      updatePinUi(sec.pinIsSet);
+      lastOnExceedValue = $("setOnExceed").value;
+    } catch (e) {
+      $("settingsUnavailableNotice").classList.add("show");
+    }
+
+    const PIN_PRIVACY_WARNING =
+      'PINs and the settings below travel as plain text over this FoxLAB WiFi ' +
+      'connection (the shared password shown on the Launcher screen) - anyone else ' +
+      'on that network while you\'re using this page could see them. "On Exceed" can ' +
+      'be set to wipe the SD card after too many wrong PIN attempts - double-check ' +
+      'before turning that on.';
+    $("setPinBtn").addEventListener("click", async () => {
+      const newPin = $("setPinNew").value;
+      const confirmPin = $("setPinConfirm").value;
+      if (!/^[0-9]{1,10}$/.test(newPin)) { logLine("PIN must be 1-10 digits.", "e"); return; }
+      if (newPin !== confirmPin) { logLine("PINs don't match.", "e"); return; }
+      if (!confirm(PIN_PRIVACY_WARNING + "\n\nSet this PIN on the Flipper?")) return;
+      try {
+        await flipper.setPin("", newPin);
+        logLine("PIN set.", "ok");
+        renderFlipperSettings();
+      } catch (e) { logLine("Set PIN failed: " + pinErrorMessage(e), "e"); }
+    });
+    $("changePinBtn").addEventListener("click", async () => {
+      const currentPin = $("setPinCurrent").value;
+      const newPin = $("setPinNew").value;
+      const confirmPin = $("setPinConfirm").value;
+      if (!currentPin) { logLine("Enter the current PIN first.", "e"); return; }
+      if (!/^[0-9]{1,10}$/.test(newPin)) { logLine("PIN must be 1-10 digits.", "e"); return; }
+      if (newPin !== confirmPin) { logLine("PINs don't match.", "e"); return; }
+      if (!confirm(PIN_PRIVACY_WARNING + "\n\nChange the PIN on the Flipper?")) return;
+      try {
+        await flipper.setPin(currentPin, newPin);
+        logLine("PIN changed.", "ok");
+        renderFlipperSettings();
+      } catch (e) { logLine("Change PIN failed: " + pinErrorMessage(e), "e"); }
+    });
+    $("removePinBtn").addEventListener("click", async () => {
+      const currentPin = $("setPinCurrent").value;
+      if (!currentPin) { logLine("Enter the current PIN first.", "e"); return; }
+      if (!confirm(PIN_PRIVACY_WARNING + "\n\nRemove the PIN from the Flipper? Anyone with physical access will be able to unlock it.")) return;
+      try {
+        await flipper.clearPin(currentPin);
+        logLine("PIN removed.", "ok");
+        renderFlipperSettings();
+      } catch (e) { logLine("Remove PIN failed: " + pinErrorMessage(e), "e"); }
+    });
+
+    // Pure select/range settings save themselves on change instead of
+    // needing their own Apply button (task #86) - autoSave() wires that
+    // up generically; a "Saved!" pill (see showSavedPill() above) is the
+    // only feedback on success. Only Device Name (text entry), the PIN
+    // actions above (their own explicit buttons - a save here is
+    // security-sensitive enough to want a deliberate click either way),
+    // Night Shift (real time-of-day entry, not just picking an option),
+    // and the alarm editor below (multi-field, its own explicit Save)
+    // keep an explicit action instead.
+    function autoSave(ids, label, saveFn) {
+      ids.forEach((id) => {
+        $(id).addEventListener("change", async () => {
+          try {
+            await saveFn();
+            showSavedPill();
+          } catch (e) { logLine(label + " save failed: " + e.message, "e"); }
+        });
+      });
+    }
+
+    autoSave(
+      ["setMaxAttempts", "setPoweroffLocked", "setAutoLock", "setUsbNoAutoLock"],
+      "Security",
+      () => flipper.setSecuritySettings(collectSecurityPayload())
+    );
+    // On Exceed gets its own listener rather than autoSave() - switching it
+    // TO "Format SD" needs the same confirmation the old Apply-button flow
+    // had (too many wrong PIN attempts will wipe the SD card), and a
+    // cancel needs to revert the select rather than silently leaving it on
+    // a value that was never actually saved.
+    $("setOnExceed").addEventListener("change", async () => {
+      if ($("setOnExceed").value === "1" &&
+          !confirm('"On Exceed" is set to "Format SD" - too many wrong PIN attempts will wipe the SD card. Continue?')) {
+        $("setOnExceed").value = lastOnExceedValue;
+        return;
+      }
+      try {
+        await flipper.setSecuritySettings(collectSecurityPayload());
+        lastOnExceedValue = $("setOnExceed").value;
+        showSavedPill();
+      } catch (e) { logLine("Security save failed: " + e.message, "e"); }
+    });
+    autoSave(
+      ["setOnLockEnabled", "setDisconnectBle", "setDisconnectGpio", "setUsbLevel"],
+      "Advanced Security",
+      () => flipper.setSecuritySettings(collectSecurityPayload())
+    );
+    autoSave(
+      ["setLockShowTime", "setLockShowSeconds", "setLockShowDate", "setLockShowStatusbar", "setLockUnlockPrompt"],
+      "Lock Screen Display",
+      () => flipper.setSecuritySettings(collectSecurityPayload())
+    );
+
+    autoSave(["setTheme"], "Menu theme", () => flipper.setThemeSettings(Number($("setTheme").value)));
+
+    autoSave(
+      ["setContrast", "setBacklight", "setLed", "setVolume", "setDelay", "setVibro", "setInversion"],
+      "Display & sound",
+      () => flipper.setNotifSettings({
+        contrast: Number($("setContrast").value),
+        backlightPct: Number($("setBacklight").value),
+        ledPct: Number($("setLed").value),
+        volumePct: Number($("setVolume").value),
+        delayMs: Number($("setDelay").value),
+        vibro: $("setVibro").value === "1",
+        inversion: $("setInversion").value === "1",
+      })
+    );
+
+    // ── Settings: task #75/#82 additions ────────────────────────────────
+    autoSave(
+      ["setBatteryView", "setShowClock", "setMidnightFmt", "setWifiIcon", "setStatusbarIcons", "setShellColor"],
+      "Desktop display",
+      () => flipper.setDesktopSettings({
+        batteryView: Number($("setBatteryView").value),
+        showClock: $("setShowClock").value === "1",
+        midnightFormat: $("setMidnightFmt").value === "1",
+        wifiIconHidden: $("setWifiIcon").value === "1",
+        statusbarIcons: $("setStatusbarIcons").value === "1",
+        shellColorIdx: Number($("setShellColor").value),
+      })
+    );
+
+    autoSave(
+      ["setAlarmBacklight", "setAlarmBeep", "setAlarmVibrate"],
+      "Fox Alarm",
+      () => flipper.setAlarmSettings({
+        alarmKeepBacklight: $("setAlarmBacklight").value === "1",
+        alarmBeep: $("setAlarmBeep").value === "1",
+        alarmVibrate: $("setAlarmVibrate").value === "1",
+      })
+    );
+
+    autoSave(
+      ["setRgbInstalled", "setRgbWhiteMode", "setRgbLed1", "setRgbLed2", "setRgbLed3",
+       "setRgbEffect", "setRgbSpeed", "setRgbStep", "setRgbSaturation", "setRgbWaveWide"],
+      "RGB backlight",
+      () => flipper.setRgbSettings({
+        rgbInstalled: $("setRgbInstalled").value === "1",
+        rgbWhiteMode: $("setRgbWhiteMode").value === "1",
+        rgbLed1: Number($("setRgbLed1").value),
+        rgbLed2: Number($("setRgbLed2").value),
+        rgbLed3: Number($("setRgbLed3").value),
+        rgbEffect: Number($("setRgbEffect").value),
+        rgbSpeedMs: Number($("setRgbSpeed").value),
+        rgbStep: Number($("setRgbStep").value),
+        rgbSaturation: Number($("setRgbSaturation").value),
+        rgbWaveWide: Number($("setRgbWaveWide").value),
+      })
+    );
+
+    autoSave(
+      ["setAutoPoweroff", "setLimitCharge"],
+      "Power",
+      () => flipper.setPowerSettings({
+        autoPoweroffIdx: Number($("setAutoPoweroff").value),
+        limitChargeIdx: Number($("setLimitCharge").value),
+      })
+    );
+
+    autoSave(["setBtEnabled"], "Bluetooth", () => flipper.setBtSettings($("setBtEnabled").value === "1"));
+
+    autoSave(
+      ["setTimeFmt", "setDateFmt", "setUnits", "setHand"],
+      "Locale",
+      () => flipper.setLocaleSettings({
+        timeFormat: Number($("setTimeFmt").value),
+        dateFormat: Number($("setDateFmt").value),
+        units: Number($("setUnits").value),
+        handOrient: Number($("setHand").value),
+      })
+    );
+
+    // Sleep Method/File Naming auto-save through the same combined command
+    // Device Name uses (see foxr_handle_settings_system_set()) - that's
+    // fine here, since resending the current, unchanged Device Name value
+    // never trips a restart on its own (see applyDeviceNameBtn's handler
+    // below for the case that does).
+    autoSave(
+      ["setSleepMethod", "setFileNaming"],
+      "System",
+      () => flipper.setSystemSettings({
+        sleepMethod: Number($("setSleepMethod").value),
+        fileNaming: Number($("setFileNaming").value),
+        deviceName: $("setDeviceName").value,
+      })
+    );
+
+    autoSave(
+      ["setVibroLevel", "setVibroTrigger"],
+      "Notifications",
+      () => flipper.setInputSettings({
+        vibroLevelIdx: Number($("setVibroLevel").value),
+        vibroTriggerIdx: Number($("setVibroTrigger").value),
+      })
+    );
+
+    $("applyNightShiftBtn").addEventListener("click", async () => {
+      try {
+        const timeToMin = (t) => {
+          const m = /^(\d{2}):(\d{2})$/.exec(t || "");
+          return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+        };
+        await flipper.setNightShiftSettings({
+          nightShiftIdx: Number($("setNightShift").value),
+          nightShiftStartMin: timeToMin($("setNightShiftStart").value),
+          nightShiftEndMin: timeToMin($("setNightShiftEnd").value),
+        });
+        logLine("Night Shift settings saved.", "ok");
+      } catch (e) { logLine("Night Shift save failed: " + e.message, "e"); }
+    });
+    // Device Name lives in its own card (up top) but is saved via the same
+    // combined FLPR/SETTINGS/SYSTEM/SET command as Sleep Method/File Naming
+    // (see foxr_handle_settings_system_set()'s comment) - so this sends the
+    // current value of all three either way. Unlike before, saving no
+    // longer reboots the Flipper immediately (that would also power-cycle
+    // the attached ESP32 and drop this very connection) - it only does
+    // that if the name actually changed, and even then just remembers a
+    // pending restart for when the FoxLAB app is closed on the Flipper
+    // itself (see restart_confirm_view.c/app.h's device_name_restart_
+    // pending), rather than doing it from here.
+    $("applyDeviceNameBtn").addEventListener("click", async () => {
+      try {
+        const restartPending = await flipper.setSystemSettings({
+          sleepMethod: Number($("setSleepMethod").value),
+          fileNaming: Number($("setFileNaming").value),
+          deviceName: $("setDeviceName").value,
+        });
+        if (restartPending) {
+          alert("Device name will update on next reboot. A reminder has been set.");
+          logLine("Device Name saved - restart reminder set.", "ok");
+        } else {
+          logLine("Device Name saved.", "ok");
+        }
+      } catch (e) { logLine("Device Name save failed: " + e.message, "e"); }
+    });
+
+    // ── Fox Alarm Clock: individual alarm list (task #96) ───────────────
+    const ALARM_DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const ALARM_DAY_BITS = [1, 2, 4, 8, 16, 32, 64];
+    let alarmEditIndex = null; // null while adding a new alarm; an existing alarm's index while editing one
+    let alarmEditDaysMask = 0;
+    const padTime = (n) => String(n).padStart(2, "0");
+    function formatAlarmTime(hour, minute) { return padTime(hour) + ":" + padTime(minute); }
+    function formatAlarmDays(daysMask, recurring) {
+      if (!recurring) return "Once";
+      if (daysMask === 127) return "Every day";
+      const names = ALARM_DAY_BITS.map((bit, i) => (daysMask & bit) ? ALARM_DAY_LABELS[i] : null).filter(Boolean);
+      return names.length ? names.join(", ") : "No days selected";
+    }
+    function updateAlarmDaysVisibility() {
+      $("alarmEditDays").style.display = $("alarmEditRecurring").value === "1" ? "" : "none";
+    }
+    function renderAlarmDayChips() {
+      const el = $("alarmEditDays");
+      el.innerHTML = ALARM_DAY_LABELS.map((name, i) =>
+        `<button type="button" class="bsm day-chip${(alarmEditDaysMask & ALARM_DAY_BITS[i]) ? " sel" : ""}" data-bit="${ALARM_DAY_BITS[i]}">${name}</button>`
+      ).join("");
+      el.querySelectorAll(".day-chip").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const bit = Number(btn.dataset.bit);
+          alarmEditDaysMask ^= bit;
+          btn.classList.toggle("sel", !!(alarmEditDaysMask & bit));
+        });
+      });
+    }
+    function openAlarmEditor(alarm) {
+      alarmEditIndex = alarm ? alarm.index : null;
+      alarmEditDaysMask = alarm ? alarm.daysMask : 0;
+      $("alarmEditTime").value = alarm ? formatAlarmTime(alarm.hour, alarm.minute) : "07:00";
+      $("alarmEditActive").value = alarm && !alarm.active ? "0" : "1";
+      $("alarmEditRecurring").value = alarm && !alarm.recurring ? "0" : "1";
+      renderAlarmDayChips();
+      updateAlarmDaysVisibility();
+      $("alarmEditSaveBtn").textContent = alarm ? "Save Changes" : "Add Alarm";
+      $("alarmEditor").style.display = "";
+    }
+    function closeAlarmEditor() {
+      $("alarmEditor").style.display = "none";
+      alarmEditIndex = null;
+    }
+    async function renderAlarmList() {
+      const listBody = $("alarmListBody");
+      let alarms;
+      try {
+        alarms = await flipper.getAlarmList();
+      } catch (e) {
+        listBody.innerHTML = `<div class="empty">Couldn't read the alarm list: ${e.message}</div>`;
+        return;
+      }
+      if (!alarms.length) {
+        listBody.innerHTML = '<div class="empty">No alarms set yet.</div>';
+        return;
+      }
+      listBody.innerHTML = alarms.map((a) => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--mono);font-size:1rem;color:${a.active ? "#fff" : "#666"}">${formatAlarmTime(a.hour, a.minute)}</div>
+          <div style="flex:1;color:#999;font-size:.8rem">${formatAlarmDays(a.daysMask, a.recurring)}${a.active ? "" : " \u00b7 Off"}</div>
+          <button class="bsm alarm-edit-btn" data-index="${a.index}">Edit</button>
+          <button class="bsm alarm-delete-btn" data-index="${a.index}">Delete</button>
+        </div>
+      `).join("");
+      listBody.querySelectorAll(".alarm-edit-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const a = alarms.find((x) => x.index === Number(btn.dataset.index));
+          if (a) openAlarmEditor(a);
+        });
+      });
+      listBody.querySelectorAll(".alarm-delete-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Delete this alarm?")) return;
+          try {
+            await flipper.deleteAlarm(Number(btn.dataset.index));
+            logLine("Alarm deleted.", "ok");
+            renderAlarmList();
+          } catch (e) { logLine("Delete alarm failed: " + e.message, "e"); }
+        });
+      });
+    }
+    $("addAlarmBtn").addEventListener("click", () => openAlarmEditor(null));
+    $("alarmEditCancelBtn").addEventListener("click", closeAlarmEditor);
+    $("alarmEditRecurring").addEventListener("change", updateAlarmDaysVisibility);
+    $("alarmEditSaveBtn").addEventListener("click", async () => {
+      const m = /^(\d{2}):(\d{2})$/.exec($("alarmEditTime").value || "");
+      if (!m) { logLine("Enter a valid alarm time.", "e"); return; }
+      const recurring = $("alarmEditRecurring").value === "1";
+      if (recurring && alarmEditDaysMask === 0) {
+        logLine("Select at least one day, or set Repeat to \"Once\".", "e");
+        return;
+      }
+      const payload = {
+        hour: Number(m[1]), minute: Number(m[2]),
+        daysMask: alarmEditDaysMask, active: $("alarmEditActive").value === "1", recurring,
+      };
+      try {
+        if (alarmEditIndex === null) {
+          await flipper.addAlarm(payload);
+          logLine("Alarm added.", "ok");
+        } else {
+          await flipper.editAlarm(alarmEditIndex, payload);
+          logLine("Alarm saved.", "ok");
+        }
+        closeAlarmEditor();
+        renderAlarmList();
+      } catch (e) {
+        logLine("Save alarm failed: " + (e.message === "FULL" ? "Alarm list is full (8 max)." : e.message), "e");
+      }
+    });
+    renderAlarmList();
+  }
+
+  // Hook the remaining Flipper section entries not already wired via
+  // onEnterFlipperSection() above.
+  const _origEnter = onEnterFlipperSection;
+  onEnterFlipperSection = async function (section) {
+    await _origEnter(section);
+    if (section === "pulseplotter") ensurePlotterUi();
+    if (section === "subghz") ensureSubghzViewerUi();
+    if (section === "settings") await renderFlipperSettings();
+    if (section === "libraries" && !librariesState.scanned) await scanLibraries();
+  };
+
+  // ══════════════════════ ESP32: command console builder ══════════════
+
+  function makeCmdConsole(containerId, commands, opts) {
+    opts = opts || {};
+    const el = $(containerId);
+    let html = "";
+    if (opts.gateNotice) {
+      html += `<div class="notice warn show">Gated commands below need <code>SETTINGS:ATTACKS:ON</code> first (Settings tab) - they reply <code>ERROR:DISABLED</code> otherwise, and this firmware self-limits every burst to a few seconds.</div>`;
+    }
+    html += '<div class="cmd-grid">' + commands.map((c, i) =>
+      `<button class="cmd-btn" data-idx="${i}" disabled>${c.label}</button>`
+    ).join("") + "</div>";
+    html += `<div class="cmd-out" id="${containerId}Out"></div>
+      <div class="cmd-input-row">
+        <input type="text" id="${containerId}RawInput" placeholder="Or type a raw command…" autocomplete="off">
+        <button class="bsm" id="${containerId}RawSend" disabled>Send</button>
+      </div>`;
+    el.innerHTML = html;
+    const out = $(containerId + "Out");
+    function print(line, cls) {
+      const div = document.createElement("div");
+      if (cls) div.style.color = cls;
+      div.textContent = line;
+      out.appendChild(div);
+      out.scrollTop = out.scrollHeight;
+    }
+    el.querySelectorAll(".cmd-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const cmd = commands[+btn.dataset.idx];
+        let text = cmd.cmd;
+        if (cmd.prompt) {
+          const val = prompt(cmd.prompt);
+          if (val === null) return;
+          text = cmd.cmd + val;
+        }
+        print("> " + text);
+        try {
+          const off = esp32.onLine((line) => print(line, line.startsWith("ERROR") ? "#e88" : "#8e8"));
+          await esp32.send(text);
+          setTimeout(off, cmd.durationMs || 9000);
+        } catch (e) { print("send failed: " + e.message, "#e88"); }
+      });
+    });
+    const rawInput = $(containerId + "RawInput");
+    const rawSend = $(containerId + "RawSend");
+    const sendRaw = async () => {
+      const text = rawInput.value;
+      if (!text) return;
+      print("> " + text);
+      // Scoped listener, same as the preset buttons above - not a permanent
+      // subscription, so typing into one panel's raw box doesn't also echo
+      // into every other panel's output.
+      const off = esp32.onLine((line) => print(line, line.startsWith("ERROR") ? "#e88" : "#8e8"));
+      esp32.send(text).catch(e => print("send failed: " + e.message, "#e88"));
+      setTimeout(off, 9000);
+      rawInput.value = "";
+    };
+    rawSend.addEventListener("click", sendRaw);
+    rawInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendRaw(); });
+    return {
+      setEnabled(enabled) {
+        el.querySelectorAll(".cmd-btn, button, input").forEach(b => { b.disabled = !enabled; });
+      },
+    };
+  }
+
+  // ── Terminal tab (ESP32) ─────────────────────────────────────────────
+  // Was "AI" (a Gemini relay) - dropped because the FoxLAB AP has no
+  // internet passthrough for it to actually reach Gemini with (same reason
+  // Showcase/FAP Compiler were removed entirely, for the same missing-
+  // internet reason). gemini.cpp/gemini.h and the AIASK/AICOOLDOWN commands are left
+  // in place on the ESP32 side - dead but harmless, same call this project
+  // has made for other now-unreachable-from-the-UI features - only this
+  // tab and its makeCmdConsole() entry are gone.
+  //
+  // In its place: a raw terminal into FoxDispatch::handleCommand(), styled
+  // after lab.flipper.net's own CLI splash (block-letter banner + welcome
+  // blurb + firmware line + prompt) - structurally similar on purpose, but
+  // original content throughout: "FOXLAB" instead of "FLIPPER", and wording
+  // that describes this firmware instead of theirs. An ASCII mascot sat
+  // above the banner here originally but never looked right at terminal
+  // width, so it's gone - user's call, removed rather than kept fiddling
+  // with it.
+  const TERM_FOXLAB_BANNER = [
+    " _____ _____  ___        _    ____",
+    "|  ___/ _ \\ \\/ / |      / \\  | __ )",
+    "| |_ | | | \\  /| |     / _ \\ |  _ \\",
+    "|  _|| |_| /  \\| |___ / ___ \\| |_) |",
+    "|_|   \\___/_/\\_\\_____/_/   \\_\\____/",
+  ].join("\n");
+
+  function buildEsp32Terminal(containerId) {
+    const el = $(containerId);
+    el.innerHTML = `
+      <div class="card" style="padding:0;overflow:hidden">
+        <pre class="term-banner" id="${containerId}Banner"></pre>
+      </div>
+      <div class="cmd-out term-out" id="${containerId}Out"></div>
+      <div class="cmd-input-row">
+        <input type="text" id="${containerId}Input" placeholder="Type a command…" autocomplete="off">
+        <button class="bsm pri" id="${containerId}Send" disabled>Send</button>
+      </div>`;
+    const banner = $(containerId + "Banner");
+    banner.textContent = TERM_FOXLAB_BANNER + "\n\n" +
+      "Welcome to the FoxLAB Terminal.\n\n" +
+      "This is a raw line into the Fox ESP32 Firmware's own command dispatcher\n" +
+      "- the same one every tab above ultimately talks to. Anything it doesn't\n" +
+      "recognize is just echoed back, so there's nothing here that typing the\n" +
+      "wrong thing can break. Try \"info\" or \"[LIST]\" to see what it knows.\n\n" +
+      "Firmware: querying…";
+    const out = $(containerId + "Out");
+    function print(line, cls) {
+      const div = document.createElement("div");
+      if (cls) div.style.color = cls;
+      div.textContent = line;
+      out.appendChild(div);
+      out.scrollTop = out.scrollHeight;
+    }
+    // Unlike makeCmdConsole()'s scoped, auto-unsubscribed-after-a-timeout
+    // listeners, this one is permanent - a terminal should show everything
+    // the ESP32 says for as long as the page is open, not just replies to
+    // commands typed in this one box (other tabs' button presses show up
+    // here too, same as a real serial monitor would show activity from any
+    // source on the same UART).
+    esp32.onLine((line) => print(line, line.startsWith("ERROR") ? "#e88" : "#8e8"));
+    const input = $(containerId + "Input");
+    const send = $(containerId + "Send");
+    const sendCmd = () => {
+      const text = input.value;
+      if (!text) return;
+      print("> " + text, "#ffb870");
+      esp32.send(text).catch(e => print("send failed: " + e.message, "#e88"));
+      input.value = "";
+    };
+    send.addEventListener("click", sendCmd);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") sendCmd(); });
+    return {
+      setEnabled(enabled) { input.disabled = !enabled; send.disabled = !enabled; },
+      // Called once from onEsp32Connected() after a [VERSION] probe -
+      // rewrites just the banner's placeholder "Firmware: …" line in
+      // place rather than reprinting the whole banner.
+      setFirmwareLine(text) {
+        banner.textContent = banner.textContent.replace(/Firmware: .*/, "Firmware: " + text);
+      },
+    };
+  }
+
+  const esp32Consoles = {};
+  function buildEsp32Consoles() {
+    esp32Consoles.wifi = makeCmdConsole("esp32WifiBody", [
+      { label: "Scan APs", cmd: "WIFISCANAP" },
+      { label: "Scan Stations", cmd: "WIFISCANSTA" },
+      { label: "Scan All", cmd: "WIFISCANALL" },
+      { label: "List cached APs", cmd: "WIFILIST:AP" },
+      { label: "List cached STAs", cmd: "WIFILIST:STA" },
+      { label: "Select AP…", cmd: "WIFISELECT:AP:", prompt: "AP index:" },
+      { label: "Select STA…", cmd: "WIFISELECT:STA:", prompt: "STA index:" },
+      { label: "AP info…", cmd: "WIFIAPINFO:", prompt: "AP index:" },
+      { label: "Channel (read)", cmd: "WIFICHANNEL" },
+      { label: "Set channel…", cmd: "WIFICHANNEL:", prompt: "Channel 1-14:" },
+      { label: "Signal monitor (10s)", cmd: "WIFISIGMON", durationMs: 11000 },
+      { label: "Packet count (5s)", cmd: "WIFIPACKETCOUNT", durationMs: 6000 },
+      { label: "Sniff: Beacon", cmd: "WIFISNIFF:BEACON", durationMs: 9000 },
+      { label: "Sniff: Deauth", cmd: "WIFISNIFF:DEAUTH", durationMs: 9000 },
+      { label: "Sniff: Probe", cmd: "WIFISNIFF:PROBE", durationMs: 9000 },
+      { label: "Sniff: Raw", cmd: "WIFISNIFF:RAW", durationMs: 9000 },
+      { label: "Sniff: MultiSSID", cmd: "WIFISNIFF:MULTISSID", durationMs: 9000 },
+      { label: "Sniff: PMKID", cmd: "WIFISNIFF:PMKID", durationMs: 9000 },
+      { label: "Sniff: SAE", cmd: "WIFISNIFF:SAE", durationMs: 9000 },
+      { label: "MAC: show", cmd: "WIFIMAC:GET" },
+      { label: "MAC: randomize", cmd: "WIFIMAC:RAND" },
+      { label: "MAC: clone AP", cmd: "WIFIMAC:CLONEAP" },
+      { label: "MAC: reset", cmd: "WIFIMAC:RESET" },
+      { label: "Wardrive (needs GPS)", cmd: "WIFIWARDRIVE", durationMs: 15000 },
+      { label: "PCAP capture (15s)", cmd: "WIFIPCAP", durationMs: 16000 },
+      { label: "Port scan…", cmd: "WIFIPORTSCAN:", prompt: "ip:start:end e.g. 192.168.1.1:1:100", durationMs: 15000 },
+      { label: "Attack: Deauth (broadcast)", cmd: "WIFIATTACK:DEAUTH", durationMs: 6000 },
+      { label: "Attack: Deauth station…", cmd: "WIFIATTACK:DEAUTH:", prompt: "Station MAC:", durationMs: 6000 },
+      { label: "Attack: Beacon spam…", cmd: "WIFIATTACK:BEACON:", prompt: "SSID list, comma-separated:", durationMs: 6000 },
+      { label: "Attack: Probe flood", cmd: "WIFIATTACK:PROBE", durationMs: 6000 },
+      { label: "Attack: Rickroll", cmd: "WIFIATTACK:RICKROLL", durationMs: 6000 },
+      { label: "Attack: Bad packet", cmd: "WIFIATTACK:BADPACKET", durationMs: 6000 },
+      { label: "Attack: CSA", cmd: "WIFIATTACK:CSA", durationMs: 6000 },
+      { label: "Attack: Sleep", cmd: "WIFIATTACK:SLEEP", durationMs: 6000 },
+    ], { gateNotice: true });
+
+    esp32Consoles.ble = makeCmdConsole("esp32BleBody", [
+      { label: "BLE init", cmd: "BLEINIT" },
+      { label: "BLE scan", cmd: "BLESCAN", durationMs: 9000 },
+      { label: "Connect…", cmd: "BLECONN:", prompt: "MAC address:" },
+      { label: "Status", cmd: "BLESTATUS" },
+      { label: "Disconnect", cmd: "BLEDISC" },
+      { label: "Tag scan: Find My", cmd: "BLETAGSCAN:FINDMY", durationMs: 9000 },
+      { label: "Tag scan: SmartTag", cmd: "BLETAGSCAN:SMARTTAG", durationMs: 9000 },
+      { label: "Tag scan: Tile", cmd: "BLETAGSCAN:TILE", durationMs: 9000 },
+      { label: "Tag scan: Flock", cmd: "BLETAGSCAN:FLOCK", durationMs: 9000 },
+      { label: "Spam: iOS", cmd: "BLESPAM:IOS", durationMs: 9000 },
+      { label: "Spam: Windows", cmd: "BLESPAM:WINDOWS", durationMs: 9000 },
+      { label: "Spam: Samsung", cmd: "BLESPAM:SAMSUNG", durationMs: 9000 },
+      { label: "Spam: Android", cmd: "BLESPAM:ANDROID", durationMs: 9000 },
+      { label: "Spam: All", cmd: "BLESPAM:ALL", durationMs: 9000 },
+    ], { gateNotice: true });
+
+    esp32Consoles.gps = makeCmdConsole("esp32GpsBody", [
+      { label: "GPS init", cmd: "GPSINIT" },
+      { label: "Fix status", cmd: "GPS:FIX" },
+      { label: "Satellites", cmd: "GPS:SAT" },
+      { label: "Latitude", cmd: "GPS:LAT" },
+      { label: "Longitude", cmd: "GPS:LON" },
+      { label: "Altitude", cmd: "GPS:ALT" },
+      { label: "Date/time", cmd: "GPS:DATE" },
+      { label: "Track (30s)", cmd: "GPSTRACK", durationMs: 31000 },
+      { label: "POI: start", cmd: "GPSPOI:START" },
+      { label: "POI: mark…", cmd: "GPSPOI:MARK:", prompt: "Label (optional):" },
+      { label: "POI: end", cmd: "GPSPOI:END" },
+    ]);
+
+    esp32Consoles.ir = makeCmdConsole("esp32IrBody", [
+      { label: "Send…", cmd: "IRSEND:", prompt: "protocol:hex[:bits] e.g. NEC:0x00FF00FF" },
+      { label: "Receive (10s)", cmd: "IRRECV", durationMs: 11000 },
+      { label: "TV-B-Gone", cmd: "IRTVBGONE", durationMs: 8000 },
+    ]);
+
+    esp32Consoles.subghz = makeCmdConsole("esp32SubghzBody", [
+      { label: "Init", cmd: "SUBGHZINIT" },
+      { label: "Set frequency…", cmd: "SUBGHZFREQ:", prompt: "MHz, 300-928:" },
+      { label: "RX (10s)", cmd: "SUBGHZRX", durationMs: 11000 },
+      { label: "TX…", cmd: "SUBGHZTX:", prompt: "Raw hex bytes:" },
+    ]);
+
+    esp32Consoles.rfid = makeCmdConsole("esp32RfidBody", [
+      { label: "Init", cmd: "RFIDINIT" },
+      { label: "Scan for tag", cmd: "RFIDSCAN" },
+      { label: "Read block…", cmd: "RFIDREAD:", prompt: "Block number:" },
+      { label: "Write block…", cmd: "RFIDWRITE:", prompt: "block:hexdata e.g. 4:00112233445566778899AABBCCDDEEFF" },
+    ]);
+
+    esp32Consoles.terminal = buildEsp32Terminal("esp32TerminalBody");
+
+    const settingsBody = $("esp32SettingsBody");
+    settingsBody.innerHTML = `
+      <div class="card">
+        <h3>WiFi/BLE Attacks</h3>
+        <p style="color:#999;font-size:.85rem;margin-bottom:12px">WiFi/BLE attack and beacon-spam commands are refused with <code>ERROR:DISABLED</code> while this is off - this firmware self-limits every burst to a few seconds regardless.</p>
+        <label class="switch-row">
+          <span class="switch"><input type="checkbox" id="attacksToggle" disabled><span class="slider"></span></span>
+          <span class="switch-label" id="attacksToggleLabel">Disabled</span>
+        </label>
+      </div>
+      <div class="cmd-out" id="esp32SettingsOut"></div>`;
+    const settingsOut = $("esp32SettingsOut");
+    function printSettings(line) {
+      const div = document.createElement("div");
+      div.textContent = line;
+      settingsOut.appendChild(div);
+      settingsOut.scrollTop = settingsOut.scrollHeight;
+    }
+    function sendSetting(cmd) {
+      printSettings("> " + cmd);
+      const off = esp32.onLine(printSettings);
+      esp32.send(cmd).catch(e => printSettings(e.message));
+      setTimeout(off, 3000);
+    }
+    const attacksToggle = $("attacksToggle");
+    const attacksToggleLabel = $("attacksToggleLabel");
+    attacksToggle.addEventListener("change", () => {
+      attacksToggleLabel.textContent = attacksToggle.checked ? "Enabled" : "Disabled";
+      sendSetting(attacksToggle.checked ? "SETTINGS:ATTACKS:ON" : "SETTINGS:ATTACKS:OFF");
+    });
+    esp32Consoles.settingsToggle = {
+      setEnabled(en) {
+        attacksToggle.disabled = !en;
+        // Firmware has no "am I armed?" query, only the fire-and-forget
+        // ON/OFF commands below - so there's nothing to read state back
+        // from on (re)connect, same as the two-button version this
+        // replaced. Reset to the safe "Disabled" position rather than
+        // guessing/remembering a state that may no longer be true.
+        if (en) { attacksToggle.checked = false; attacksToggleLabel.textContent = "Disabled"; }
+      },
+    };
+  }
+  buildEsp32Consoles();
+
+  function setEsp32ConsolesEnabled(enabled) {
+    Object.values(esp32Consoles).forEach(c => c.setEnabled(enabled));
+  }
+
+  let lastEsp32Info = null;
+
+  async function onEsp32Connected() {
+    $("esp32Name").textContent = "ESP32 connected";
+    $("esp32Sub").textContent = "Probing firmware…";
+    setEsp32ConsolesEnabled(true);
+    const info = {};
+    try {
+      const lines = await esp32.sendAndCollect("info", (l) => l.includes("Fox ESP32 Firmware") || l.startsWith("ERROR"), 4000);
+      const ok = lines.some(l => l.includes("Fox ESP32 Firmware"));
+      $("esp32Sub").textContent = ok ? lines.join(" · ") : "Connected (unexpected response to 'info').";
+    } catch (e) {
+      $("esp32Sub").textContent = "Connected, but 'info' didn't respond: " + e.message;
+    }
+    // [VERSION] is the bracketed-protocol command http_bridge.cpp actually
+    // answers with the version string (plain "info" above only confirms
+    // the firmware is Fox_ESP32_FW at all, it doesn't say which build) -
+    // feeds both the Terminal tab's banner and the Detailed View table
+    // below.
+    try {
+      const verLines = await esp32.sendAndCollect("[VERSION]", (l) => l.startsWith("[VERSION/SUCCESS]"), 3000);
+      const verLine = verLines.find(l => l.startsWith("[VERSION/SUCCESS]"));
+      info["Firmware version"] = verLine ? verLine.slice("[VERSION/SUCCESS]".length) : "unknown";
+    } catch (e) {
+      info["Firmware version"] = "unknown";
+    }
+    esp32Consoles.terminal.setFirmwareLine(info["Firmware version"] === "unknown" ? "unknown" : "Fox ESP32 Firmware v" + info["Firmware version"]);
+    try {
+      const capLines = await esp32.sendAndCollect("CAPS", (l) => l.startsWith("HASBLE:"), 3000);
+      const capLine = capLines.find(l => l.startsWith("HASBLE:"));
+      info["Bluetooth (BLE)"] = capLine ? (capLine === "HASBLE:1" ? "Compiled in" : "Not compiled in") : "unknown";
+    } catch (e) {
+      info["Bluetooth (BLE)"] = "unknown";
+    }
+    // FOX_HAS_* flags aren't queryable directly for these four; each
+    // optional-hardware family reports ERROR:NORFID/NOSUBGHZ/NOIR/NOGPS on
+    // first use instead, so probe each with its init/no-op-ish command
+    // rather than guessing. IR has no passive init-only command, so it's
+    // probed with a real transmit - but not IRTVBGONE (real TV power-
+    // toggle codes). Instead: IRSEND:NEC:00000000:32 - a full 32-bit NEC
+    // frame where the address and command bytes are NOT complemented by
+    // their upper 16 bits (NEC requires addr/~addr and cmd/~cmd; sending
+    // 0x00000000 violates both). IRremoteESP8266's sender (what
+    // Fox_ESP32_FW's IRSEND uses) transmits whatever bit pattern it's
+    // given with no validation, so this still proves the IR LED/hardware
+    // actually fires - but essentially every real NEC-protocol receiver
+    // (TVs, ACs, etc.) checks that complement relationship before acting
+    // and silently discards a frame that fails it, so no real device
+    // treats this as a valid button press.
+    const hwChecks = [
+      { key: "RFID reader", cmd: "RFIDINIT", errTag: "NORFID" },
+      { key: "SubGHz radio", cmd: "SUBGHZINIT", errTag: "NOSUBGHZ" },
+      { key: "IR blaster", cmd: "IRSEND:NEC:00000000:32", errTag: "NOIR" },
+      { key: "GPS module", cmd: "GPSINIT", errTag: "NOGPS" },
+    ];
+    for (const chk of hwChecks) {
+      try {
+        const lines = await esp32.sendAndCollect(chk.cmd, (l) => true, 3000);
+        const enabled = !lines.some(l => l.includes(chk.errTag));
+        info[chk.key] = enabled ? "Compiled in" : "Not compiled in";
+      } catch (e) {
+        info[chk.key] = "unknown";
+      }
+    }
+    // Rolled into one always-visible table (below the hero, no button
+    // gating it anymore - see #esp32HeroWrap's permanent "detail-open"
+    // class) instead of a separate "Hardware" card - as a standing card,
+    // four rows that are "Not compiled in" on most boards (RFID/SubGHz/IR/
+    // GPS are all optional add-on hardware) took up permanent space to say
+    // very little; folded in alongside firmware/BLE it reads as real
+    // diagnostic info instead of a wall of "not compiled in".
+    lastEsp32Info = info;
+    $("esp32HeroDetailTable").innerHTML = Object.keys(lastEsp32Info).sort().map(k =>
+      `<tr><td>${k}</td><td>${lastEsp32Info[k]}</td></tr>`).join("");
+  }
+
+  // ── Back to top (visible only while the page actually has a scrollbar -
+  // section switches change page height without a resize/scroll event, so
+  // a MutationObserver catches those too) ────────────────────────────────
+  (function () {
+    const btn = $("backTop");
+    let raf = null;
+    function check() {
+      raf = null;
+      btn.classList.toggle("show", document.documentElement.scrollHeight > document.documentElement.clientHeight + 4);
+    }
+    function scheduleCheck() { if (!raf) raf = requestAnimationFrame(check); }
+    scheduleCheck();
+    window.addEventListener("resize", scheduleCheck);
+    window.addEventListener("scroll", scheduleCheck, { passive: true });
+    new MutationObserver(scheduleCheck).observe(document.body, { childList: true, subtree: true });
+    btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  })();
+
+  // ── Init ──────────────────────────────────────────────────────────
+  // Both clients are plain WebSockets to the ESP32 the browser is already
+  // on WiFi with - loading this page at all means you're already "in", so
+  // both connect automatically here rather than waiting for a button
+  // click. They're independent: a Flipper that isn't ready yet (still
+  // inside a Fox app, or just not attached) doesn't block the ESP32 tab
+  // from working, and vice versa. Each call updates its own pill/status
+  // notice on failure (see connectDevice() above) rather than throwing -
+  // nothing here needs a try/catch of its own.
+  connectDevice("esp32");
+  connectDevice("flipper");
+})();
+
+</script>
+
+</body>
+</html>

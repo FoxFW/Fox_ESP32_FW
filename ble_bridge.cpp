@@ -19,6 +19,17 @@ BLERemoteService* remoteService = nullptr;
 BLERemoteCharacteristic* writeChar = nullptr;
 BLERemoteCharacteristic* notifyChar = nullptr;
 
+// NOT SINK-REDIRECTED: ScanCallback::onResult below runs during the
+// synchronous scan->start() call inside BLESCAN, but stays hardcoded to
+// Serial rather than threading `out` through the callback class - it's
+// also reused by FoxBle::scriptScan() (called from the Fox scripting
+// engine, not from handleCommand at all), so a BLESCAN issued over
+// HTTP/WS gets a [SCANDONE]-equivalent reply but the found-device list
+// itself still only appears on the physical UART. notifyCallback is a
+// genuine async BLE-notification callback (fires whenever the connected
+// peripheral sends one, independent of any handleCommand() call) and is
+// excluded from `out` for the same reason as fox_rpc_bridge's unsolicited
+// pushes.
 const char* addressTypeLabel(uint8_t type) {
   switch (type) {
     case 0: return "PUBLIC";
@@ -126,7 +137,10 @@ void scriptScan() {
   scan->clearResults();
 }
 
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line == "BLEINIT") {
     ensureInitialized();
     Serial.println(bleInitialized ? "OK" : "ERROR");
@@ -265,6 +279,8 @@ bool handleCommand(const String& line) {
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
@@ -276,7 +292,10 @@ bool ensureInitialized() { return false; }
 bool writeHex(const String&) { return false; }
 void scriptScan() {}
 
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   static const char* prefixes[] = {
     "BLEINIT", "BLESCAN", "BLECONN:", "BLESTATUS", "BLEDISC", "BLESVC:", "BLECHAR:", "BLEWRITE:"
   };
@@ -287,6 +306,8 @@ bool handleCommand(const String& line) {
     }
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 

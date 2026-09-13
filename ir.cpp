@@ -33,7 +33,10 @@ void ensureInit() {
   irInitialized = true;
 }
 
-void doSend(const String& protocolStr, const String& hexStr, int bits) {
+void doSend(const String& protocolStr, const String& hexStr, int bits, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   ensureInit();
   decode_type_t type = strToDecodeType(protocolStr.c_str());
   if (type == UNKNOWN) {
@@ -48,9 +51,14 @@ void doSend(const String& protocolStr, const String& hexStr, int bits) {
   if (bits <= 0) bits = 32;
   irsend.send(type, data, (uint16_t)bits);
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doRecv() {
+void doRecv(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   ensureInit();
   decode_results results;
   unsigned long start = millis();
@@ -70,9 +78,14 @@ void doRecv() {
     delay(10);
   }
   Serial.println("ERROR:NOSIGNAL");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doTvBGone() {
+void doTvBGone(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   ensureInit();
   int count = (int)(sizeof(TVBGONE_CODES) / sizeof(TVBGONE_CODES[0]));
   for (int i = 0; i < count; i++) {
@@ -82,11 +95,16 @@ void doTvBGone() {
     delay(200);
   }
   Serial.println("TVBGONEDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 namespace FoxIr {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line.startsWith("IRSEND:")) {
     String rest = line.substring(strlen("IRSEND:"));
     int c1 = rest.indexOf(':');
@@ -99,28 +117,33 @@ bool handleCommand(const String& line) {
     int c2 = hexAndBits.indexOf(':');
     String hexStr = (c2 < 0) ? hexAndBits : hexAndBits.substring(0, c2);
     int bits = (c2 < 0) ? 0 : hexAndBits.substring(c2 + 1).toInt();
-    doSend(protocol, hexStr, bits);
+    doSend(protocol, hexStr, bits, out);
     return true;
   }
 
   if (line == "IRRECV") {
-    doRecv();
+    doRecv(out);
     return true;
   }
 
   if (line == "IRTVBGONE") {
-    doTvBGone();
+    doTvBGone(out);
     return true;
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 #else
 
 namespace FoxIr {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   static const char* prefixes[] = {
     "IRSEND:", "IRRECV", "IRTVBGONE"
   };
@@ -131,6 +154,8 @@ bool handleCommand(const String& line) {
     }
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 

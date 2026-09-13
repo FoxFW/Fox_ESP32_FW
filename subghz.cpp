@@ -37,7 +37,10 @@ void printHex(const uint8_t* data, size_t length) {
   }
 }
 
-void doInit() {
+void doInit(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   ELECHOUSE_cc1101.setSpiPin(SUBGHZ_SCK_PIN, SUBGHZ_MISO_PIN, SUBGHZ_MOSI_PIN, SUBGHZ_CS_PIN);
   ELECHOUSE_cc1101.setGDO0(SUBGHZ_GDO0_PIN);
   ELECHOUSE_cc1101.Init();
@@ -48,18 +51,28 @@ void doInit() {
   ELECHOUSE_cc1101.setMHZ(SUBGHZ_DEFAULT_MHZ);
   subghzInitialized = true;
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doFreq(float mhz) {
+void doFreq(float mhz, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (mhz < 300.0f || mhz > 928.0f) {
     Serial.println("ERROR:BADFREQ");
     return;
   }
   ELECHOUSE_cc1101.setMHZ(mhz);
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doRx() {
+void doRx(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   ELECHOUSE_cc1101.SetRx();
   unsigned long start = millis();
   while (millis() - start < (unsigned long)SUBGHZ_RX_WAIT_SECONDS * 1000UL) {
@@ -75,9 +88,14 @@ void doRx() {
     }
   }
   Serial.println("ERROR:NOSIGNAL");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doTx(const String& hexStr) {
+void doTx(const String& hexStr, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t buf[SUBGHZ_RX_BUFFER_MAX];
   size_t length;
   if (!hexToBytes(hexStr, buf, sizeof(buf), &length)) {
@@ -88,13 +106,18 @@ void doTx(const String& hexStr) {
   ELECHOUSE_cc1101.SendData(buf, (int)length);
   ELECHOUSE_cc1101.SetRx();
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 namespace FoxSubGhz {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line == "SUBGHZINIT") {
-    doInit();
+    doInit(out);
     return true;
   }
 
@@ -107,28 +130,33 @@ bool handleCommand(const String& line) {
 
   if (line.startsWith("SUBGHZFREQ:")) {
     float mhz = line.substring(strlen("SUBGHZFREQ:")).toFloat();
-    doFreq(mhz);
+    doFreq(mhz, out);
     return true;
   }
 
   if (line == "SUBGHZRX") {
-    doRx();
+    doRx(out);
     return true;
   }
 
   if (line.startsWith("SUBGHZTX:")) {
-    doTx(line.substring(strlen("SUBGHZTX:")));
+    doTx(line.substring(strlen("SUBGHZTX:")), out);
     return true;
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 #else
 
 namespace FoxSubGhz {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   static const char* prefixes[] = {
     "SUBGHZINIT", "SUBGHZFREQ:", "SUBGHZRX", "SUBGHZTX:"
   };
@@ -139,6 +167,8 @@ bool handleCommand(const String& line) {
     }
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 

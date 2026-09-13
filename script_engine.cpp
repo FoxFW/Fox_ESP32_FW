@@ -365,6 +365,15 @@ struct FuncDef {
 
 class Interp {
 public:
+  // Reply sink for the script's own print(...) builtin (callNative, below)
+  // and REBOOTING (rebootIfExec/whatever native issues it) - a pointer
+  // rather than threading `Print& out` through every one of this
+  // interpreter's mutually-recursive methods (execStatement/evalExpr/
+  // callNative/callUserFunction/...). cmdRun() sets this right after
+  // constructing the Interp, before calling run(). Defaults to Serial so
+  // nothing else in this class has to care whether it was set.
+  Print* out = &Serial;
+
   Token* toks = nullptr;
   int count = 0;
   int pos = 0;
@@ -495,10 +504,10 @@ public:
     if (name == "print") {
       if (exec) {
         for (int i = 0; i < argc; i++) {
-          if (i > 0) Serial.print(" ");
-          Serial.print(args[i].asStr());
+          if (i > 0) out->print(" ");
+          out->print(args[i].asStr());
         }
-        Serial.println();
+        out->println();
       }
       return Value();
     }
@@ -600,7 +609,7 @@ public:
     if (name == "device.freeHeap") return Value::ofNum(exec ? (double)ESP.getFreeHeap() : 0);
     if (name == "device.uptime") return Value::ofNum(exec ? (double)(millis() / 1000) : 0);
     if (name == "device.reboot") {
-      if (exec) { Serial.println("REBOOTING"); delay(100); ESP.restart(); }
+      if (exec) { out->println("REBOOTING"); delay(100); ESP.restart(); }
       return Value();
     }
 
@@ -1100,7 +1109,10 @@ bool sanitizeName(const String& raw, String* out) {
   return true;
 }
 
-void cmdList() {
+void cmdList(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   File root = LittleFS.open("/");
   if (!root) { Serial.println("ERROR"); return; }
   File f = root.openNextFile();
@@ -1115,9 +1127,14 @@ void cmdList() {
     f = root.openNextFile();
   }
   Serial.println("SCRIPTLISTDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void cmdSave(const String& rest) {
+void cmdSave(const String& rest, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   int sep = rest.indexOf(':');
   if (sep < 0) { Serial.println("ERROR"); return; }
   String name, path;
@@ -1130,9 +1147,14 @@ void cmdSave(const String& rest) {
   f.print(source);
   f.close();
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void cmdShow(const String& rawName) {
+void cmdShow(const String& rawName, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String path;
   if (!sanitizeName(rawName, &path)) { Serial.println("ERROR:BADNAME"); return; }
   File f = LittleFS.open(path, "r");
@@ -1140,15 +1162,25 @@ void cmdShow(const String& rawName) {
   Serial.println(f.readString());
   Serial.println("SCRIPTSHOWDONE");
   f.close();
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void cmdDel(const String& rawName) {
+void cmdDel(const String& rawName, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String path;
   if (!sanitizeName(rawName, &path)) { Serial.println("ERROR:BADNAME"); return; }
   Serial.println(LittleFS.remove(path) ? "OK" : "ERROR:NOTFOUND");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void cmdRun(const String& rawName) {
+void cmdRun(const String& rawName, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String path;
   if (!sanitizeName(rawName, &path)) { Serial.println("ERROR:BADNAME"); return; }
   File f = LittleFS.open(path, "r");
@@ -1160,6 +1192,7 @@ void cmdRun(const String& rawName) {
   if (tokenCount < 0) { Serial.println("ERROR:SCRIPTTOOLONG"); return; }
 
   Interp interp;
+  interp.out = &out;
   interp.toks = g_tokens;
   interp.count = tokenCount;
   interp.run();
@@ -1169,6 +1202,8 @@ void cmdRun(const String& rawName) {
     Serial.println(interp.errMsg);
   }
   Serial.println("SCRIPTDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
@@ -1177,12 +1212,17 @@ void begin() {
   LittleFS.begin(true);
 }
 
-bool handleCommand(const String& line) {
-  if (line == "SCRIPTLIST") { cmdList(); return true; }
-  if (line.startsWith("SCRIPTSAVE:")) { cmdSave(line.substring(11)); return true; }
-  if (line.startsWith("SCRIPTSHOW:")) { cmdShow(line.substring(11)); return true; }
-  if (line.startsWith("SCRIPTDEL:")) { cmdDel(line.substring(10)); return true; }
-  if (line.startsWith("SCRIPTRUN:")) { cmdRun(line.substring(10)); return true; }
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
+  if (line == "SCRIPTLIST") { cmdList(out); return true; }
+  if (line.startsWith("SCRIPTSAVE:")) { cmdSave(line.substring(11), out); return true; }
+  if (line.startsWith("SCRIPTSHOW:")) { cmdShow(line.substring(11), out); return true; }
+  if (line.startsWith("SCRIPTDEL:")) { cmdDel(line.substring(10), out); return true; }
+  if (line.startsWith("SCRIPTRUN:")) { cmdRun(line.substring(10), out); return true; }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }

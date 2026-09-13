@@ -178,7 +178,13 @@ bool parseHttpDate(const String& d, SimpleDT* out) {
 
 unsigned long lastPostAttemptMs = 0;
 
-void doPost(const String& message) {
+void doPost(const String& message, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
+  Serial.print("DISCORDHEAP:post enter=");
+  Serial.println(ESP.getFreeHeap());
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("ERROR:NOWIFI");
     return;
@@ -222,15 +228,28 @@ void doPost(const String& message) {
   int code = http.POST(payload);
   http.end();
 
+  Serial.print("DISCORDHEAP:post after=");
+  Serial.print(ESP.getFreeHeap());
+  Serial.print(" min=");
+  Serial.println(ESP.getMinFreeHeap());
+
   if (code == 200 || code == 201) {
     Serial.println("OK");
   } else {
     Serial.print("ERROR:HTTP:");
     Serial.println(code);
   }
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doRead(int limit) {
+void doRead(int limit, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
+  Serial.print("DISCORDHEAP:read enter=");
+  Serial.println(ESP.getFreeHeap());
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("ERROR:NOWIFI");
     return;
@@ -251,6 +270,10 @@ void doRead(int limit) {
   const char* headerKeys[] = {"Date"};
   http.collectHeaders(headerKeys, 1);
   int code = http.GET();
+  Serial.print("DISCORDHEAP:read after=");
+  Serial.print(ESP.getFreeHeap());
+  Serial.print(" min=");
+  Serial.println(ESP.getMinFreeHeap());
   if (code != 200) {
     Serial.print("ERROR:HTTP:");
     Serial.println(code);
@@ -313,26 +336,33 @@ void doRead(int limit) {
     Serial.println(content);
   }
   Serial.println("DISCORDREADDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 namespace FoxDiscord {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line.startsWith("DISCORDPOST:")) {
-    doPost(line.substring(strlen("DISCORDPOST:")));
+    doPost(line.substring(strlen("DISCORDPOST:")), out);
     return true;
   }
 
   if (line == "DISCORDREAD") {
-    doRead(DISCORD_READ_LIMIT_DEFAULT);
+    doRead(DISCORD_READ_LIMIT_DEFAULT, out);
     return true;
   }
 
   if (line.startsWith("DISCORDREAD:")) {
-    doRead(line.substring(strlen("DISCORDREAD:")).toInt());
+    doRead(line.substring(strlen("DISCORDREAD:")).toInt(), out);
     return true;
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }

@@ -17,6 +17,24 @@
 #define FOX_HAS_IR 0
 #define FOX_HAS_GPS 0
 
+// FoxLAB (the FoxLAB WiFi AP + captive web portal toggled by the Flipper's
+// "FoxLAB" app - see fox_lab.cpp) is a WiFi AP + a single plain-HTTP
+// WebServer, with its page living in flash via PROGMEM (not RAM). That's
+// a lighter version of what fox_csi.cpp's web UI already runs on every
+// board including S2 - AP + WebServer + a WebSocketsServer on top - with
+// no gate at all, so FoxLAB doesn't add a new category of S2 RAM risk.
+// S2 gate is OPEN below. It stays here, easy to flip back to 0 for S2
+// only, in case on-device testing says otherwise - in particular, FoxLAB
+// running at the same time as anything that does a TLS handshake
+// (Discord/GitHub/Gemini's HTTPS clients - the actual RAM ceiling that's
+// been hit on S2, being tracked separately) is the case worth watching,
+// since that eats into the same free-heap pool.
+#if defined(CONFIG_IDF_TARGET_ESP32S2)
+#define FOX_HAS_LAB 1
+#else
+#define FOX_HAS_LAB 1
+#endif
+
 #define SERIAL_BAUD 115200
 #define LINE_BUFFER_MAX 2200
 #define HEX_BUFFER_MAX 256
@@ -28,7 +46,7 @@
 // to keep recon/attack range from taking too much of a hit.
 #define FOX_WIFI_TX_POWER WIFI_POWER_15dBm
 
-#define FOX_FIRMWARE_VERSION "1.2.2"
+#define FOX_FIRMWARE_VERSION "1.3.0"
 
 #define BLE_SCAN_SECONDS 5
 
@@ -96,6 +114,35 @@
 #define GEMINI_RELAY_BASE_URL "https://foxfw-gemini-relay.foxcustomfirmware.workers.dev"
 #define GEMINI_RELAY_APP_KEY  "foxfw-esp32-gemini-v1"
 
+// Only g_tokens/g_arrays/g_objects (below) are actually reserved as static
+// RAM at boot on every board, regardless of whether scripting is ever used -
+// SCRIPT_SOURCE_MAX/VARS_MAX/STRING_MAX bound dynamic Strings and a
+// stack-local interpreter instead, so they're left equal to every other
+// board (shrinking them would risk breaking real scripts for no RAM gain).
+// On the S2 (320KB SRAM vs. classic's 520KB) the three static tables at
+// their full size account for ~42KB of static RAM that competes directly
+// with the heap TLS needs for Fox Chat/Gemini. The limits below keep >1.5x
+// headroom over a realistic multi-step automation script (measured ~150
+// tokens for a WiFi-connect + heap-check + GPIO + HTTP loop) while still
+// freeing a meaningful chunk of that 42KB on S2 only.
+#if defined(CONFIG_IDF_TARGET_ESP32S2)
+#define SCRIPT_SOURCE_MAX 2048
+#define SCRIPT_TOKENS_MAX 256
+#define SCRIPT_VARS_MAX 24
+#define SCRIPT_STRING_MAX 160
+#define SCRIPT_CALL_ARGS_MAX 6
+#define SCRIPT_NAME_MAX 32
+#define SCRIPT_HTTP_GET_MAX 512
+
+#define SCRIPT_ARRAYS_MAX 6
+#define SCRIPT_ARRAY_LEN_MAX 20
+#define SCRIPT_OBJECTS_MAX 6
+#define SCRIPT_OBJECT_KEYS_MAX 10
+#define SCRIPT_FUNCS_MAX 8
+#define SCRIPT_FUNC_PARAMS_MAX 4
+#define SCRIPT_CALL_DEPTH_MAX 6
+#define SCRIPT_LOOP_MAX_ITER 5000
+#else
 #define SCRIPT_SOURCE_MAX 2048
 #define SCRIPT_TOKENS_MAX 512
 #define SCRIPT_VARS_MAX 24
@@ -112,6 +159,7 @@
 #define SCRIPT_FUNC_PARAMS_MAX 4
 #define SCRIPT_CALL_DEPTH_MAX 6
 #define SCRIPT_LOOP_MAX_ITER 5000
+#endif
 
 #define SCRIPT_STORAGE_KEY_MAX 32
 #define SCRIPT_STORAGE_VALUE_MAX 128

@@ -98,7 +98,10 @@ const char* encTypeLabel(wifi_auth_mode_t enc) {
   }
 }
 
-void printApEntry(int index) {
+void printApEntry(int index, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (index < 0 || index >= apCount) return;
   const ApEntry& e = apList[index];
   Serial.print("AP:"); Serial.print(index);
@@ -107,14 +110,21 @@ void printApEntry(int index) {
   Serial.print(" ch:"); Serial.print(e.channel);
   Serial.print(" rssi:"); Serial.print(e.rssi);
   Serial.print(" enc:"); Serial.println(encTypeLabel(e.encType));
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void printStaEntry(int index) {
+void printStaEntry(int index, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (index < 0 || index >= staCount) return;
   const StaEntry& e = staList[index];
   Serial.print("STA:"); Serial.print(index);
   Serial.print(" mac:"); Serial.print(macToString(e.mac));
   Serial.print(" rssi:"); Serial.println(e.rssi);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 // Extracts the SSID information element starting at `ieOffset` in an 802.11
@@ -132,6 +142,18 @@ String extractSsid(const uint8_t* payload, int len, int ieOffset) {
   return String(ssidBuf);
 }
 
+// NOT SINK-REDIRECTED: this is the WiFi driver's own promiscuous-mode
+// RX callback (IRAM_ATTR - runs in the driver's own context, not on any
+// handleCommand() call stack). Its live per-packet output (BEACON:,
+// DEAUTH:/DISASSOC:, PROBEREQ:/PROBERESP:, RAW:, MULTISSID:, PMKID:,
+// SAE:, PCAPPKT:/PCAPDATA:/PCAPEND) stays hardcoded to the physical
+// Serial and is not reachable from the WiFi dispatch tables tasks
+// #10/#11 build - only the DONE/COUNT:/PCAPDONE: summaries the calling
+// handleCommand()/run*() function prints once scanning stops go through
+// `out`. WIFIMACTRACK is the one exception that looks similar but isn't:
+// runMacTrack() polls macTrackList itself and prints MACTRACK: lines from
+// its own synchronous loop, not from this callback, so those ARE
+// redirected.
 void IRAM_ATTR promiscuousCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
   auto* pkt = (wifi_promiscuous_pkt_t*)buf;
   const uint8_t* payload = pkt->payload;
@@ -340,7 +362,10 @@ void startPromiscuous(PromiscMode mode) {
   esp_wifi_set_promiscuous(true);
 }
 
-void scanAp() {
+void scanAp(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   int found = WiFi.scanNetworks(false, true);
   selectedApIndex = -1;
   if (found < 0) {
@@ -358,24 +383,34 @@ void scanAp() {
     apList[i].rssi = WiFi.RSSI(i);
     apList[i].channel = WiFi.channel(i);
     apList[i].encType = WiFi.encryptionType(i);
-    printApEntry(i);
+    printApEntry(i, out);
   }
   WiFi.scanDelete();
   Serial.println("SCANDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void scanSta() {
+void scanSta(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   staCount = 0;
   selectedStaIndex = -1;
   startPromiscuous(PromiscMode::STA_SNIFF);
   unsigned long start = millis();
   while (millis() - start < (unsigned long)WIFI_STA_SNIFF_SECONDS * 1000UL) delay(10);
   stopPromiscuous();
-  for (int i = 0; i < staCount; i++) printStaEntry(i);
+  for (int i = 0; i < staCount; i++) printStaEntry(i, out);
   Serial.println("SCANDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-bool runSniff(const String& modeStr) {
+bool runSniff(const String& modeStr, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   PromiscMode m;
   if (modeStr == "BEACON") m = PromiscMode::SNIFF_BEACON;
   else if (modeStr == "DEAUTH") m = PromiscMode::SNIFF_DEAUTH;
@@ -392,9 +427,14 @@ bool runSniff(const String& modeStr) {
   stopPromiscuous();
   Serial.println("SNIFFDONE");
   return true;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runWardrive() {
+void runWardrive(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   int found = WiFi.scanNetworks(false, true);
   if (found < 0) {
     Serial.print("SCANERROR:"); Serial.println(found);
@@ -417,9 +457,14 @@ void runWardrive() {
   }
   WiFi.scanDelete();
   Serial.println("WARDRIVEDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runPcapCapture() {
+void runPcapCapture(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   promiscCounter = 0;
   startPromiscuous(PromiscMode::CAPTURE);
   unsigned long start = millis();
@@ -437,9 +482,14 @@ void runPcapCapture() {
   }
   stopPromiscuous();
   Serial.print("PCAPDONE:"); Serial.println(promiscCounter);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runPingScan() {
+void runPingScan(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (WiFi.status() != WL_CONNECTED) { Serial.println("ERROR:NOWIFI"); return; }
   uint32_t localIp   = (uint32_t)WiFi.localIP();
   uint32_t mask      = (uint32_t)WiFi.subnetMask();
@@ -461,9 +511,14 @@ void runPingScan() {
     delay(1);
   }
   Serial.print("PINGSCANDONE:"); Serial.println(found);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runArpScan() {
+void runArpScan(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (WiFi.status() != WL_CONNECTED) { Serial.println("ERROR:NOWIFI"); return; }
   uint32_t localIp   = (uint32_t)WiFi.localIP();
   uint32_t mask      = (uint32_t)WiFi.subnetMask();
@@ -503,9 +558,14 @@ void runArpScan() {
     }
   }
   Serial.print("ARPDONE:"); Serial.println(found);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runMacTrack() {
+void runMacTrack(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   macTrackCount = 0;
   startPromiscuous(PromiscMode::MACTRACK);
   uint8_t channel = 1;
@@ -533,6 +593,8 @@ void runMacTrack() {
     lastReported++;
   }
   Serial.print("MACTRACKDONE:"); Serial.println(macTrackCount);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
@@ -564,18 +626,21 @@ int scriptScanApCount() {
   return apCount;
 }
 
-bool handleCommand(const String& line) {
-  if (line == "WIFISCANAP") { scanAp(); return true; }
-  if (line == "WIFISCANSTA") { scanSta(); return true; }
-  if (line == "WIFISCANALL") { scanAp(); scanSta(); return true; }
-  if (line == "WIFIWARDRIVE") { runWardrive(); return true; }
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
+  if (line == "WIFISCANAP") { scanAp(out); return true; }
+  if (line == "WIFISCANSTA") { scanSta(out); return true; }
+  if (line == "WIFISCANALL") { scanAp(out); scanSta(out); return true; }
+  if (line == "WIFIWARDRIVE") { runWardrive(out); return true; }
 
   if (line == "WIFILIST:AP") {
-    for (int i = 0; i < apCount; i++) printApEntry(i);
+    for (int i = 0; i < apCount; i++) printApEntry(i, out);
     Serial.println("DONE"); return true;
   }
   if (line == "WIFILIST:STA") {
-    for (int i = 0; i < staCount; i++) printStaEntry(i);
+    for (int i = 0; i < staCount; i++) printStaEntry(i, out);
     Serial.println("DONE"); return true;
   }
 
@@ -594,7 +659,7 @@ bool handleCommand(const String& line) {
   if (line.startsWith("WIFIAPINFO:")) {
     int idx = line.substring(11).toInt();
     if (idx < 0 || idx >= apCount) Serial.println("ERROR");
-    else printApEntry(idx);
+    else printApEntry(idx, out);
     return true;
   }
 
@@ -634,11 +699,11 @@ bool handleCommand(const String& line) {
     return true;
   }
 
-  if (line == "WIFIPCAP") { runPcapCapture(); return true; }
+  if (line == "WIFIPCAP") { runPcapCapture(out); return true; }
 
   if (line.startsWith("WIFISNIFF:")) {
     String mode = line.substring(10); mode.trim(); mode.toUpperCase();
-    if (!runSniff(mode)) Serial.println("ERROR:BADMODE");
+    if (!runSniff(mode, out)) Serial.println("ERROR:BADMODE");
     return true;
   }
 
@@ -676,10 +741,12 @@ bool handleCommand(const String& line) {
     return true;
   }
 
-  if (line == "WIFIPINGSCAN") { runPingScan(); return true; }
-  if (line == "WIFIARPSCAN") { runArpScan(); return true; }
-  if (line == "WIFIMACTRACK") { runMacTrack(); return true; }
+  if (line == "WIFIPINGSCAN") { runPingScan(out); return true; }
+  if (line == "WIFIARPSCAN") { runArpScan(out); return true; }
+  if (line == "WIFIMACTRACK") { runMacTrack(out); return true; }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }

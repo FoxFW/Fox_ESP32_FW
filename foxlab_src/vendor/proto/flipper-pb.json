@@ -1,0 +1,1631 @@
+{
+  "options": {
+    "syntax": "proto3"
+  },
+  "nested": {
+    "PB": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf"
+      },
+      "nested": {
+        "CommandStatus": {
+          "values": {
+            "OK": 0,
+            "ERROR": 1,
+            "ERROR_DECODE": 2,
+            "ERROR_NOT_IMPLEMENTED": 3,
+            "ERROR_BUSY": 4,
+            "ERROR_CONTINUOUS_COMMAND_INTERRUPTED": 14,
+            "ERROR_INVALID_PARAMETERS": 15,
+            "ERROR_STORAGE_NOT_READY": 5,
+            "ERROR_STORAGE_EXIST": 6,
+            "ERROR_STORAGE_NOT_EXIST": 7,
+            "ERROR_STORAGE_INVALID_PARAMETER": 8,
+            "ERROR_STORAGE_DENIED": 9,
+            "ERROR_STORAGE_INVALID_NAME": 10,
+            "ERROR_STORAGE_INTERNAL": 11,
+            "ERROR_STORAGE_NOT_IMPLEMENTED": 12,
+            "ERROR_STORAGE_ALREADY_OPEN": 13,
+            "ERROR_STORAGE_DIR_NOT_EMPTY": 18,
+            "ERROR_APP_CANT_START": 16,
+            "ERROR_APP_SYSTEM_LOCKED": 17,
+            "ERROR_APP_NOT_RUNNING": 21,
+            "ERROR_APP_CMD_ERROR": 22,
+            "ERROR_VIRTUAL_DISPLAY_ALREADY_STARTED": 19,
+            "ERROR_VIRTUAL_DISPLAY_NOT_STARTED": 20,
+            "ERROR_GPIO_MODE_INCORRECT": 58,
+            "ERROR_GPIO_UNKNOWN_PIN_MODE": 59,
+            "ERROR_GPS_NOT_SUPPORTED": 60,
+            "ERROR_GPS_NO_PERMISSION": 61,
+            "ERROR_GPS_DISABLED": 62,
+            "ERROR_GPS_UNKNOWN": 63
+          }
+        },
+        "Empty": {
+          "fields": {}
+        },
+        "StopSession": {
+          "fields": {}
+        },
+        "Main": {
+          "oneofs": {
+            "content": {
+              "oneof": [
+                "empty",
+                "stopSession",
+                "systemPingRequest",
+                "systemPingResponse",
+                "systemRebootRequest",
+                "systemDeviceInfoRequest",
+                "systemDeviceInfoResponse",
+                "systemFactoryResetRequest",
+                "systemGetDatetimeRequest",
+                "systemGetDatetimeResponse",
+                "systemSetDatetimeRequest",
+                "systemPlayAudiovisualAlertRequest",
+                "systemProtobufVersionRequest",
+                "systemProtobufVersionResponse",
+                "systemUpdateRequest",
+                "systemUpdateResponse",
+                "systemPowerInfoRequest",
+                "systemPowerInfoResponse",
+                "storageInfoRequest",
+                "storageInfoResponse",
+                "storageTimestampRequest",
+                "storageTimestampResponse",
+                "storageStatRequest",
+                "storageStatResponse",
+                "storageListRequest",
+                "storageListResponse",
+                "storageReadRequest",
+                "storageReadResponse",
+                "storageWriteRequest",
+                "storageDeleteRequest",
+                "storageMkdirRequest",
+                "storageMd5sumRequest",
+                "storageMd5sumResponse",
+                "storageRenameRequest",
+                "storageBackupCreateRequest",
+                "storageBackupRestoreRequest",
+                "storageTarExtractRequest",
+                "appStartRequest",
+                "appLockStatusRequest",
+                "appLockStatusResponse",
+                "appExitRequest",
+                "appLoadFileRequest",
+                "appButtonPressRequest",
+                "appButtonReleaseRequest",
+                "appButtonPressReleaseRequest",
+                "appGetErrorRequest",
+                "appGetErrorResponse",
+                "appDataExchangeRequest",
+                "guiStartScreenStreamRequest",
+                "guiStopScreenStreamRequest",
+                "guiScreenFrame",
+                "guiSendInputEventRequest",
+                "guiStartVirtualDisplayRequest",
+                "guiStopVirtualDisplayRequest",
+                "gpioSetPinMode",
+                "gpioSetInputPull",
+                "gpioGetPinMode",
+                "gpioGetPinModeResponse",
+                "gpioReadPin",
+                "gpioReadPinResponse",
+                "gpioWritePin",
+                "gpioGetOtgMode",
+                "gpioGetOtgModeResponse",
+                "gpioSetOtgMode",
+                "appStateResponse",
+                "propertyGetRequest",
+                "propertyGetResponse",
+                "desktopIsLockedRequest",
+                "desktopUnlockRequest",
+                "desktopStatusSubscribeRequest",
+                "desktopStatusUnsubscribeRequest",
+                "desktopStatus",
+                "networkConnectRequest",
+                "networkConnectResponse",
+                "networkSendRequest",
+                "networkSendResponse",
+                "networkReceiveData",
+                "networkCloseRequest",
+                "networkCloseResponse",
+                "networkStateChanged",
+                "gpsStreamStartRequest",
+                "gpsStreamStopRequest",
+                "gpsLocationRequest",
+                "gpsLocation",
+                "networkHttpRequest",
+                "networkHttpResponse",
+                "networkWebsocketOpenRequest"
+              ]
+            }
+          },
+          "fields": {
+            "commandId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "commandStatus": {
+              "type": "CommandStatus",
+              "id": 2
+            },
+            "hasNext": {
+              "type": "bool",
+              "id": 3
+            },
+            "empty": {
+              "type": "Empty",
+              "id": 4
+            },
+            "stopSession": {
+              "type": "StopSession",
+              "id": 19
+            },
+            "systemPingRequest": {
+              "type": ".PB_System.PingRequest",
+              "id": 5
+            },
+            "systemPingResponse": {
+              "type": ".PB_System.PingResponse",
+              "id": 6
+            },
+            "systemRebootRequest": {
+              "type": ".PB_System.RebootRequest",
+              "id": 31
+            },
+            "systemDeviceInfoRequest": {
+              "type": ".PB_System.DeviceInfoRequest",
+              "id": 32
+            },
+            "systemDeviceInfoResponse": {
+              "type": ".PB_System.DeviceInfoResponse",
+              "id": 33
+            },
+            "systemFactoryResetRequest": {
+              "type": ".PB_System.FactoryResetRequest",
+              "id": 34
+            },
+            "systemGetDatetimeRequest": {
+              "type": ".PB_System.GetDateTimeRequest",
+              "id": 35
+            },
+            "systemGetDatetimeResponse": {
+              "type": ".PB_System.GetDateTimeResponse",
+              "id": 36
+            },
+            "systemSetDatetimeRequest": {
+              "type": ".PB_System.SetDateTimeRequest",
+              "id": 37
+            },
+            "systemPlayAudiovisualAlertRequest": {
+              "type": ".PB_System.PlayAudiovisualAlertRequest",
+              "id": 38
+            },
+            "systemProtobufVersionRequest": {
+              "type": ".PB_System.ProtobufVersionRequest",
+              "id": 39
+            },
+            "systemProtobufVersionResponse": {
+              "type": ".PB_System.ProtobufVersionResponse",
+              "id": 40
+            },
+            "systemUpdateRequest": {
+              "type": ".PB_System.UpdateRequest",
+              "id": 41
+            },
+            "systemUpdateResponse": {
+              "type": ".PB_System.UpdateResponse",
+              "id": 46
+            },
+            "systemPowerInfoRequest": {
+              "type": ".PB_System.PowerInfoRequest",
+              "id": 44
+            },
+            "systemPowerInfoResponse": {
+              "type": ".PB_System.PowerInfoResponse",
+              "id": 45
+            },
+            "storageInfoRequest": {
+              "type": ".PB_Storage.InfoRequest",
+              "id": 28
+            },
+            "storageInfoResponse": {
+              "type": ".PB_Storage.InfoResponse",
+              "id": 29
+            },
+            "storageTimestampRequest": {
+              "type": ".PB_Storage.TimestampRequest",
+              "id": 59
+            },
+            "storageTimestampResponse": {
+              "type": ".PB_Storage.TimestampResponse",
+              "id": 60
+            },
+            "storageStatRequest": {
+              "type": ".PB_Storage.StatRequest",
+              "id": 24
+            },
+            "storageStatResponse": {
+              "type": ".PB_Storage.StatResponse",
+              "id": 25
+            },
+            "storageListRequest": {
+              "type": ".PB_Storage.ListRequest",
+              "id": 7
+            },
+            "storageListResponse": {
+              "type": ".PB_Storage.ListResponse",
+              "id": 8
+            },
+            "storageReadRequest": {
+              "type": ".PB_Storage.ReadRequest",
+              "id": 9
+            },
+            "storageReadResponse": {
+              "type": ".PB_Storage.ReadResponse",
+              "id": 10
+            },
+            "storageWriteRequest": {
+              "type": ".PB_Storage.WriteRequest",
+              "id": 11
+            },
+            "storageDeleteRequest": {
+              "type": ".PB_Storage.DeleteRequest",
+              "id": 12
+            },
+            "storageMkdirRequest": {
+              "type": ".PB_Storage.MkdirRequest",
+              "id": 13
+            },
+            "storageMd5sumRequest": {
+              "type": ".PB_Storage.Md5sumRequest",
+              "id": 14
+            },
+            "storageMd5sumResponse": {
+              "type": ".PB_Storage.Md5sumResponse",
+              "id": 15
+            },
+            "storageRenameRequest": {
+              "type": ".PB_Storage.RenameRequest",
+              "id": 30
+            },
+            "storageBackupCreateRequest": {
+              "type": ".PB_Storage.BackupCreateRequest",
+              "id": 42
+            },
+            "storageBackupRestoreRequest": {
+              "type": ".PB_Storage.BackupRestoreRequest",
+              "id": 43
+            },
+            "storageTarExtractRequest": {
+              "type": ".PB_Storage.TarExtractRequest",
+              "id": 71
+            },
+            "appStartRequest": {
+              "type": ".PB_App.StartRequest",
+              "id": 16
+            },
+            "appLockStatusRequest": {
+              "type": ".PB_App.LockStatusRequest",
+              "id": 17
+            },
+            "appLockStatusResponse": {
+              "type": ".PB_App.LockStatusResponse",
+              "id": 18
+            },
+            "appExitRequest": {
+              "type": ".PB_App.AppExitRequest",
+              "id": 47
+            },
+            "appLoadFileRequest": {
+              "type": ".PB_App.AppLoadFileRequest",
+              "id": 48
+            },
+            "appButtonPressRequest": {
+              "type": ".PB_App.AppButtonPressRequest",
+              "id": 49
+            },
+            "appButtonReleaseRequest": {
+              "type": ".PB_App.AppButtonReleaseRequest",
+              "id": 50
+            },
+            "appButtonPressReleaseRequest": {
+              "type": ".PB_App.AppButtonPressReleaseRequest",
+              "id": 75
+            },
+            "appGetErrorRequest": {
+              "type": ".PB_App.GetErrorRequest",
+              "id": 63
+            },
+            "appGetErrorResponse": {
+              "type": ".PB_App.GetErrorResponse",
+              "id": 64
+            },
+            "appDataExchangeRequest": {
+              "type": ".PB_App.DataExchangeRequest",
+              "id": 65
+            },
+            "guiStartScreenStreamRequest": {
+              "type": ".PB_Gui.StartScreenStreamRequest",
+              "id": 20
+            },
+            "guiStopScreenStreamRequest": {
+              "type": ".PB_Gui.StopScreenStreamRequest",
+              "id": 21
+            },
+            "guiScreenFrame": {
+              "type": ".PB_Gui.ScreenFrame",
+              "id": 22
+            },
+            "guiSendInputEventRequest": {
+              "type": ".PB_Gui.SendInputEventRequest",
+              "id": 23
+            },
+            "guiStartVirtualDisplayRequest": {
+              "type": ".PB_Gui.StartVirtualDisplayRequest",
+              "id": 26
+            },
+            "guiStopVirtualDisplayRequest": {
+              "type": ".PB_Gui.StopVirtualDisplayRequest",
+              "id": 27
+            },
+            "gpioSetPinMode": {
+              "type": ".PB_Gpio.SetPinMode",
+              "id": 51
+            },
+            "gpioSetInputPull": {
+              "type": ".PB_Gpio.SetInputPull",
+              "id": 52
+            },
+            "gpioGetPinMode": {
+              "type": ".PB_Gpio.GetPinMode",
+              "id": 53
+            },
+            "gpioGetPinModeResponse": {
+              "type": ".PB_Gpio.GetPinModeResponse",
+              "id": 54
+            },
+            "gpioReadPin": {
+              "type": ".PB_Gpio.ReadPin",
+              "id": 55
+            },
+            "gpioReadPinResponse": {
+              "type": ".PB_Gpio.ReadPinResponse",
+              "id": 56
+            },
+            "gpioWritePin": {
+              "type": ".PB_Gpio.WritePin",
+              "id": 57
+            },
+            "gpioGetOtgMode": {
+              "type": ".PB_Gpio.GetOtgMode",
+              "id": 72
+            },
+            "gpioGetOtgModeResponse": {
+              "type": ".PB_Gpio.GetOtgModeResponse",
+              "id": 73
+            },
+            "gpioSetOtgMode": {
+              "type": ".PB_Gpio.SetOtgMode",
+              "id": 74
+            },
+            "appStateResponse": {
+              "type": ".PB_App.AppStateResponse",
+              "id": 58
+            },
+            "propertyGetRequest": {
+              "type": ".PB_Property.GetRequest",
+              "id": 61
+            },
+            "propertyGetResponse": {
+              "type": ".PB_Property.GetResponse",
+              "id": 62
+            },
+            "desktopIsLockedRequest": {
+              "type": ".PB_Desktop.IsLockedRequest",
+              "id": 66
+            },
+            "desktopUnlockRequest": {
+              "type": ".PB_Desktop.UnlockRequest",
+              "id": 67
+            },
+            "desktopStatusSubscribeRequest": {
+              "type": ".PB_Desktop.StatusSubscribeRequest",
+              "id": 68
+            },
+            "desktopStatusUnsubscribeRequest": {
+              "type": ".PB_Desktop.StatusUnsubscribeRequest",
+              "id": 69
+            },
+            "desktopStatus": {
+              "type": ".PB_Desktop.Status",
+              "id": 70
+            },
+            "networkConnectRequest": {
+              "type": ".PB_Network.ConnectRequest",
+              "id": 76
+            },
+            "networkConnectResponse": {
+              "type": ".PB_Network.ConnectResponse",
+              "id": 77
+            },
+            "networkSendRequest": {
+              "type": ".PB_Network.SendRequest",
+              "id": 78
+            },
+            "networkSendResponse": {
+              "type": ".PB_Network.SendResponse",
+              "id": 79
+            },
+            "networkReceiveData": {
+              "type": ".PB_Network.ReceiveData",
+              "id": 80
+            },
+            "networkCloseRequest": {
+              "type": ".PB_Network.CloseRequest",
+              "id": 81
+            },
+            "networkCloseResponse": {
+              "type": ".PB_Network.CloseResponse",
+              "id": 82
+            },
+            "networkStateChanged": {
+              "type": ".PB_Network.StateChanged",
+              "id": 83
+            },
+            "gpsStreamStartRequest": {
+              "type": ".PB_Gps.StreamStartRequest",
+              "id": 84
+            },
+            "gpsStreamStopRequest": {
+              "type": ".PB_Gps.StreamStopRequest",
+              "id": 85
+            },
+            "gpsLocationRequest": {
+              "type": ".PB_Gps.LocationRequest",
+              "id": 86
+            },
+            "gpsLocation": {
+              "type": ".PB_Gps.Location",
+              "id": 87
+            },
+            "networkHttpRequest": {
+              "type": ".PB_Network.HttpRequest",
+              "id": 88
+            },
+            "networkHttpResponse": {
+              "type": ".PB_Network.HttpResponse",
+              "id": 89
+            },
+            "networkWebsocketOpenRequest": {
+              "type": ".PB_Network.WebSocketOpenRequest",
+              "id": 90
+            }
+          }
+        },
+        "Region": {
+          "fields": {
+            "countryCode": {
+              "type": "bytes",
+              "id": 1
+            },
+            "bands": {
+              "rule": "repeated",
+              "type": "Band",
+              "id": 2
+            }
+          },
+          "nested": {
+            "Band": {
+              "fields": {
+                "start": {
+                  "type": "uint32",
+                  "id": 1
+                },
+                "end": {
+                  "type": "uint32",
+                  "id": 2
+                },
+                "powerLimit": {
+                  "type": "int32",
+                  "id": 3
+                },
+                "dutyCycle": {
+                  "type": "uint32",
+                  "id": 4
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "PB_Storage": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.storage"
+      },
+      "nested": {
+        "File": {
+          "fields": {
+            "type": {
+              "type": "FileType",
+              "id": 1
+            },
+            "name": {
+              "type": "string",
+              "id": 2
+            },
+            "size": {
+              "type": "uint32",
+              "id": 3
+            },
+            "data": {
+              "type": "bytes",
+              "id": 4
+            },
+            "md5sum": {
+              "type": "string",
+              "id": 5
+            }
+          },
+          "nested": {
+            "FileType": {
+              "values": {
+                "FILE": 0,
+                "DIR": 1
+              }
+            }
+          }
+        },
+        "InfoRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "InfoResponse": {
+          "fields": {
+            "totalSpace": {
+              "type": "uint64",
+              "id": 1
+            },
+            "freeSpace": {
+              "type": "uint64",
+              "id": 2
+            }
+          }
+        },
+        "TimestampRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "TimestampResponse": {
+          "fields": {
+            "timestamp": {
+              "type": "uint32",
+              "id": 1
+            }
+          }
+        },
+        "StatRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "StatResponse": {
+          "fields": {
+            "file": {
+              "type": "File",
+              "id": 1
+            }
+          }
+        },
+        "ListRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            },
+            "includeMd5": {
+              "type": "bool",
+              "id": 2
+            },
+            "filterMaxSize": {
+              "type": "uint32",
+              "id": 3
+            }
+          }
+        },
+        "ListResponse": {
+          "fields": {
+            "file": {
+              "rule": "repeated",
+              "type": "File",
+              "id": 1
+            }
+          }
+        },
+        "ReadRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "ReadResponse": {
+          "fields": {
+            "file": {
+              "type": "File",
+              "id": 1
+            }
+          }
+        },
+        "WriteRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            },
+            "file": {
+              "type": "File",
+              "id": 2
+            }
+          }
+        },
+        "DeleteRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            },
+            "recursive": {
+              "type": "bool",
+              "id": 2
+            }
+          }
+        },
+        "MkdirRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "Md5sumRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "Md5sumResponse": {
+          "fields": {
+            "md5sum": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "RenameRequest": {
+          "fields": {
+            "oldPath": {
+              "type": "string",
+              "id": 1
+            },
+            "newPath": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        },
+        "BackupCreateRequest": {
+          "fields": {
+            "archivePath": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "BackupRestoreRequest": {
+          "fields": {
+            "archivePath": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "TarExtractRequest": {
+          "fields": {
+            "tarPath": {
+              "type": "string",
+              "id": 1
+            },
+            "outPath": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        }
+      }
+    },
+    "PB_System": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.system"
+      },
+      "nested": {
+        "PingRequest": {
+          "fields": {
+            "data": {
+              "type": "bytes",
+              "id": 1
+            }
+          }
+        },
+        "PingResponse": {
+          "fields": {
+            "data": {
+              "type": "bytes",
+              "id": 1
+            }
+          }
+        },
+        "RebootRequest": {
+          "fields": {
+            "mode": {
+              "type": "RebootMode",
+              "id": 1
+            }
+          },
+          "nested": {
+            "RebootMode": {
+              "values": {
+                "OS": 0,
+                "DFU": 1,
+                "UPDATE": 2
+              }
+            }
+          }
+        },
+        "DeviceInfoRequest": {
+          "fields": {}
+        },
+        "DeviceInfoResponse": {
+          "fields": {
+            "key": {
+              "type": "string",
+              "id": 1
+            },
+            "value": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        },
+        "FactoryResetRequest": {
+          "fields": {}
+        },
+        "GetDateTimeRequest": {
+          "fields": {}
+        },
+        "GetDateTimeResponse": {
+          "fields": {
+            "datetime": {
+              "type": "DateTime",
+              "id": 1
+            }
+          }
+        },
+        "SetDateTimeRequest": {
+          "fields": {
+            "datetime": {
+              "type": "DateTime",
+              "id": 1
+            }
+          }
+        },
+        "DateTime": {
+          "fields": {
+            "hour": {
+              "type": "uint32",
+              "id": 1
+            },
+            "minute": {
+              "type": "uint32",
+              "id": 2
+            },
+            "second": {
+              "type": "uint32",
+              "id": 3
+            },
+            "day": {
+              "type": "uint32",
+              "id": 4
+            },
+            "month": {
+              "type": "uint32",
+              "id": 5
+            },
+            "year": {
+              "type": "uint32",
+              "id": 6
+            },
+            "weekday": {
+              "type": "uint32",
+              "id": 7
+            }
+          }
+        },
+        "PlayAudiovisualAlertRequest": {
+          "fields": {}
+        },
+        "ProtobufVersionRequest": {
+          "fields": {}
+        },
+        "ProtobufVersionResponse": {
+          "fields": {
+            "major": {
+              "type": "uint32",
+              "id": 1
+            },
+            "minor": {
+              "type": "uint32",
+              "id": 2
+            }
+          }
+        },
+        "UpdateRequest": {
+          "fields": {
+            "updateManifest": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "UpdateResponse": {
+          "fields": {
+            "code": {
+              "type": "UpdateResultCode",
+              "id": 1
+            }
+          },
+          "nested": {
+            "UpdateResultCode": {
+              "values": {
+                "OK": 0,
+                "ManifestPathInvalid": 1,
+                "ManifestFolderNotFound": 2,
+                "ManifestInvalid": 3,
+                "StageMissing": 4,
+                "StageIntegrityError": 5,
+                "ManifestPointerError": 6,
+                "TargetMismatch": 7,
+                "OutdatedManifestVersion": 8,
+                "IntFull": 9,
+                "UnspecifiedError": 10
+              }
+            }
+          }
+        },
+        "PowerInfoRequest": {
+          "fields": {}
+        },
+        "PowerInfoResponse": {
+          "fields": {
+            "key": {
+              "type": "string",
+              "id": 1
+            },
+            "value": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        }
+      }
+    },
+    "PB_App": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.app"
+      },
+      "nested": {
+        "StartRequest": {
+          "fields": {
+            "name": {
+              "type": "string",
+              "id": 1
+            },
+            "args": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        },
+        "LockStatusRequest": {
+          "fields": {}
+        },
+        "LockStatusResponse": {
+          "fields": {
+            "locked": {
+              "type": "bool",
+              "id": 1
+            }
+          }
+        },
+        "AppExitRequest": {
+          "fields": {}
+        },
+        "AppLoadFileRequest": {
+          "fields": {
+            "path": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "AppButtonPressRequest": {
+          "fields": {
+            "args": {
+              "type": "string",
+              "id": 1
+            },
+            "index": {
+              "type": "int32",
+              "id": 2
+            }
+          }
+        },
+        "AppButtonReleaseRequest": {
+          "fields": {}
+        },
+        "AppButtonPressReleaseRequest": {
+          "fields": {
+            "args": {
+              "type": "string",
+              "id": 1
+            },
+            "index": {
+              "type": "int32",
+              "id": 2
+            }
+          }
+        },
+        "AppState": {
+          "values": {
+            "APP_CLOSED": 0,
+            "APP_STARTED": 1
+          }
+        },
+        "AppStateResponse": {
+          "fields": {
+            "state": {
+              "type": "AppState",
+              "id": 1
+            }
+          }
+        },
+        "GetErrorRequest": {
+          "fields": {}
+        },
+        "GetErrorResponse": {
+          "fields": {
+            "code": {
+              "type": "uint32",
+              "id": 1
+            },
+            "text": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        },
+        "DataExchangeRequest": {
+          "fields": {
+            "data": {
+              "type": "bytes",
+              "id": 1
+            }
+          }
+        }
+      }
+    },
+    "PB_Gui": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.screen"
+      },
+      "nested": {
+        "InputKey": {
+          "values": {
+            "UP": 0,
+            "DOWN": 1,
+            "RIGHT": 2,
+            "LEFT": 3,
+            "OK": 4,
+            "BACK": 5
+          }
+        },
+        "InputType": {
+          "values": {
+            "PRESS": 0,
+            "RELEASE": 1,
+            "SHORT": 2,
+            "LONG": 3,
+            "REPEAT": 4
+          }
+        },
+        "ScreenOrientation": {
+          "values": {
+            "HORIZONTAL": 0,
+            "HORIZONTAL_FLIP": 1,
+            "VERTICAL": 2,
+            "VERTICAL_FLIP": 3
+          }
+        },
+        "ScreenFrame": {
+          "fields": {
+            "data": {
+              "type": "bytes",
+              "id": 1
+            },
+            "orientation": {
+              "type": "ScreenOrientation",
+              "id": 2
+            },
+            "bgColor": {
+              "type": "uint32",
+              "id": 3
+            },
+            "fgColor": {
+              "type": "uint32",
+              "id": 4
+            }
+          }
+        },
+        "StartScreenStreamRequest": {
+          "fields": {}
+        },
+        "StopScreenStreamRequest": {
+          "fields": {}
+        },
+        "SendInputEventRequest": {
+          "fields": {
+            "key": {
+              "type": "InputKey",
+              "id": 1
+            },
+            "type": {
+              "type": "InputType",
+              "id": 2
+            }
+          }
+        },
+        "StartVirtualDisplayRequest": {
+          "fields": {
+            "firstFrame": {
+              "type": "ScreenFrame",
+              "id": 1
+            },
+            "sendInput": {
+              "type": "bool",
+              "id": 2
+            }
+          }
+        },
+        "StopVirtualDisplayRequest": {
+          "fields": {}
+        }
+      }
+    },
+    "PB_Gpio": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.gpio"
+      },
+      "nested": {
+        "GpioPin": {
+          "values": {
+            "PC0": 0,
+            "PC1": 1,
+            "PC3": 2,
+            "PB2": 3,
+            "PB3": 4,
+            "PA4": 5,
+            "PA6": 6,
+            "PA7": 7
+          }
+        },
+        "GpioPinMode": {
+          "values": {
+            "OUTPUT": 0,
+            "INPUT": 1
+          }
+        },
+        "GpioInputPull": {
+          "values": {
+            "NO": 0,
+            "UP": 1,
+            "DOWN": 2
+          }
+        },
+        "GpioOtgMode": {
+          "values": {
+            "OFF": 0,
+            "ON": 1
+          }
+        },
+        "SetPinMode": {
+          "fields": {
+            "pin": {
+              "type": "GpioPin",
+              "id": 1
+            },
+            "mode": {
+              "type": "GpioPinMode",
+              "id": 2
+            }
+          }
+        },
+        "SetInputPull": {
+          "fields": {
+            "pin": {
+              "type": "GpioPin",
+              "id": 1
+            },
+            "pullMode": {
+              "type": "GpioInputPull",
+              "id": 2
+            }
+          }
+        },
+        "GetPinMode": {
+          "fields": {
+            "pin": {
+              "type": "GpioPin",
+              "id": 1
+            }
+          }
+        },
+        "GetPinModeResponse": {
+          "fields": {
+            "mode": {
+              "type": "GpioPinMode",
+              "id": 1
+            }
+          }
+        },
+        "ReadPin": {
+          "fields": {
+            "pin": {
+              "type": "GpioPin",
+              "id": 1
+            }
+          }
+        },
+        "ReadPinResponse": {
+          "fields": {
+            "value": {
+              "type": "uint32",
+              "id": 2
+            }
+          }
+        },
+        "WritePin": {
+          "fields": {
+            "pin": {
+              "type": "GpioPin",
+              "id": 1
+            },
+            "value": {
+              "type": "uint32",
+              "id": 2
+            }
+          }
+        },
+        "GetOtgMode": {
+          "fields": {}
+        },
+        "GetOtgModeResponse": {
+          "fields": {
+            "mode": {
+              "type": "GpioOtgMode",
+              "id": 1
+            }
+          }
+        },
+        "SetOtgMode": {
+          "fields": {
+            "mode": {
+              "type": "GpioOtgMode",
+              "id": 1
+            }
+          }
+        }
+      }
+    },
+    "PB_Property": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.property"
+      },
+      "nested": {
+        "GetRequest": {
+          "fields": {
+            "key": {
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "GetResponse": {
+          "fields": {
+            "key": {
+              "type": "string",
+              "id": 1
+            },
+            "value": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        }
+      }
+    },
+    "PB_Desktop": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.desktop"
+      },
+      "nested": {
+        "IsLockedRequest": {
+          "fields": {}
+        },
+        "UnlockRequest": {
+          "fields": {}
+        },
+        "StatusSubscribeRequest": {
+          "fields": {}
+        },
+        "StatusUnsubscribeRequest": {
+          "fields": {}
+        },
+        "Status": {
+          "fields": {
+            "locked": {
+              "type": "bool",
+              "id": 1
+            }
+          }
+        }
+      }
+    },
+    "PB_Network": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.network"
+      },
+      "nested": {
+        "Protocol": {
+          "values": {
+            "TCP": 0,
+            "UDP": 1
+          }
+        },
+        "HttpMethod": {
+          "values": {
+            "HTTP_GET": 0,
+            "HTTP_POST": 1,
+            "HTTP_PUT": 2,
+            "HTTP_PATCH": 3,
+            "HTTP_DELETE": 4,
+            "HTTP_HEAD": 5
+          }
+        },
+        "ConnectionState": {
+          "values": {
+            "DISCONNECTED": 0,
+            "CONNECTING": 1,
+            "CONNECTED": 2,
+            "ERROR": 3
+          }
+        },
+        "ErrorCode": {
+          "values": {
+            "NONE": 0,
+            "DNS_FAILED": 1,
+            "TIMEOUT": 2,
+            "CONNECTION_REFUSED": 3,
+            "NETWORK_UNREACHABLE": 4,
+            "HOST_UNREACHABLE": 5,
+            "INVALID_CONNECTION": 6,
+            "NOT_CONNECTED": 7,
+            "SEND_FAILED": 8,
+            "RECEIVE_FAILED": 9,
+            "MAX_CONNECTIONS": 10,
+            "INVALID_PROTOCOL": 11,
+            "INTERNAL_ERROR": 12,
+            "TLS_FAILED": 13,
+            "INVALID_URL": 14,
+            "FILE_ERROR": 15
+          }
+        },
+        "ConnectRequest": {
+          "fields": {
+            "host": {
+              "type": "string",
+              "id": 1
+            },
+            "port": {
+              "type": "uint32",
+              "id": 2
+            },
+            "protocol": {
+              "type": "Protocol",
+              "id": 3
+            },
+            "timeoutMs": {
+              "type": "uint32",
+              "id": 4
+            },
+            "connectionId": {
+              "type": "uint32",
+              "id": 5
+            }
+          }
+        },
+        "ConnectResponse": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "state": {
+              "type": "ConnectionState",
+              "id": 2
+            },
+            "error": {
+              "type": "ErrorCode",
+              "id": 3
+            },
+            "resolvedIp": {
+              "type": "string",
+              "id": 4
+            }
+          }
+        },
+        "SendRequest": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "data": {
+              "type": "bytes",
+              "id": 2
+            },
+            "binary": {
+              "type": "bool",
+              "id": 3
+            }
+          }
+        },
+        "SendResponse": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "bytesSent": {
+              "type": "uint32",
+              "id": 2
+            },
+            "error": {
+              "type": "ErrorCode",
+              "id": 3
+            }
+          }
+        },
+        "ReceiveData": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "data": {
+              "type": "bytes",
+              "id": 2
+            },
+            "binary": {
+              "type": "bool",
+              "id": 3
+            }
+          }
+        },
+        "CloseRequest": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            }
+          }
+        },
+        "CloseResponse": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "error": {
+              "type": "ErrorCode",
+              "id": 2
+            }
+          }
+        },
+        "StateChanged": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "state": {
+              "type": "ConnectionState",
+              "id": 2
+            },
+            "error": {
+              "type": "ErrorCode",
+              "id": 3
+            }
+          }
+        },
+        "HttpRequest": {
+          "fields": {
+            "requestId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "method": {
+              "type": "HttpMethod",
+              "id": 2
+            },
+            "url": {
+              "type": "string",
+              "id": 3
+            },
+            "headers": {
+              "type": "string",
+              "id": 4
+            },
+            "body": {
+              "type": "bytes",
+              "id": 5
+            },
+            "sendPath": {
+              "type": "string",
+              "id": 6
+            },
+            "savePath": {
+              "type": "string",
+              "id": 7
+            },
+            "timeoutMs": {
+              "type": "uint32",
+              "id": 8
+            },
+            "includeHeaders": {
+              "type": "bool",
+              "id": 9
+            }
+          }
+        },
+        "HttpResponse": {
+          "fields": {
+            "requestId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "status": {
+              "type": "uint32",
+              "id": 2
+            },
+            "error": {
+              "type": "ErrorCode",
+              "id": 3
+            },
+            "headers": {
+              "type": "string",
+              "id": 4
+            },
+            "bodySize": {
+              "type": "uint32",
+              "id": 5
+            },
+            "savedToFile": {
+              "type": "bool",
+              "id": 6
+            }
+          }
+        },
+        "WebSocketOpenRequest": {
+          "fields": {
+            "connectionId": {
+              "type": "uint32",
+              "id": 1
+            },
+            "url": {
+              "type": "string",
+              "id": 2
+            },
+            "headers": {
+              "type": "string",
+              "id": 3
+            },
+            "timeoutMs": {
+              "type": "uint32",
+              "id": 4
+            }
+          }
+        }
+      }
+    },
+    "PB_Gps": {
+      "options": {
+        "java_package": "com.flipperdevices.protobuf.gps"
+      },
+      "nested": {
+        "StreamStartRequest": {
+          "fields": {
+            "frequency": {
+              "type": "uint32",
+              "id": 1
+            }
+          }
+        },
+        "StreamStopRequest": {
+          "fields": {}
+        },
+        "LocationRequest": {
+          "fields": {}
+        },
+        "Location": {
+          "fields": {
+            "latitude": {
+              "type": "sint32",
+              "id": 1
+            },
+            "longitude": {
+              "type": "sint32",
+              "id": 2
+            },
+            "heading": {
+              "type": "uint32",
+              "id": 3
+            },
+            "speed": {
+              "type": "uint32",
+              "id": 4
+            },
+            "altitude": {
+              "type": "sint32",
+              "id": 5
+            },
+            "accuracy": {
+              "type": "uint32",
+              "id": 6
+            },
+            "satellites": {
+              "type": "uint32",
+              "id": 7
+            }
+          }
+        }
+      }
+    }
+  }
+}

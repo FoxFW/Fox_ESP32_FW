@@ -50,7 +50,10 @@ unsigned long cooldownRemainingSec() {
   return (cooldownMs - elapsed + 999) / 1000;
 }
 
-void doAsk(const String& prompt) {
+void doAsk(const String& prompt, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("ERROR:NOWIFI");
     return;
@@ -108,27 +111,39 @@ void doAsk(const String& prompt) {
   }
 
   Serial.println("ERROR:NOREPLY");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void doCooldown() {
+void doCooldown(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   Serial.print("COOLDOWN:");
   Serial.println(cooldownRemainingSec());
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 }
 
 namespace FoxGemini {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line == "AICOOLDOWN") {
-    doCooldown();
+    doCooldown(out);
     return true;
   }
 
   if (line.startsWith("AIASK:")) {
-    doAsk(line.substring(strlen("AIASK:")));
+    doAsk(line.substring(strlen("AIASK:")), out);
     return true;
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }

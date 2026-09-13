@@ -55,6 +55,11 @@ String resolveRedirectLocation(const String& baseUrl, const String& location) {
   return origin + "/" + location;
 }
 
+// NOT SINK-REDIRECTED: this is a WebSocketsClient event callback, fired
+// from FoxHttp::loop() whenever the async SOCKET/* relay has data - not
+// part of any single handleCommand() call chain, so there is no `out` to
+// redirect to. SOCKET/START/STOP/SEND (below) are the same relay feature
+// and are excluded from the WiFi dispatch tables for the same reason.
 void wsEventHandler(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
@@ -283,7 +288,10 @@ bool tryConnect(const String& ssid, const String& pass) {
   return WiFi.status() == WL_CONNECTED;
 }
 
-void handleWifiConnect(const String& json) {
+void handleWifiConnect(const String& json, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String ssid, pass;
   bool hasSsid = jsonExtractString(json, "ssid", &ssid);
   bool hasPass = jsonExtractString(json, "password", &pass);
@@ -337,6 +345,8 @@ void handleWifiConnect(const String& json) {
     Serial.print((int)WiFi.status());
     Serial.println(")");
   }
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 bool wifiForget(const String& ssid) {
@@ -365,7 +375,10 @@ bool wifiForget(const String& ssid) {
   return true;
 }
 
-void handleWifiForget(const String& json) {
+void handleWifiForget(const String& json, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String ssid;
   if (!jsonExtractString(json, "ssid", &ssid)) {
     Serial.println("[ERROR] missing ssid");
@@ -376,9 +389,14 @@ void handleWifiForget(const String& json) {
   } else {
     Serial.println("[ERROR] network not found");
   }
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handleWifiSave(const String& json) {
+void handleWifiSave(const String& json, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String ssid, pass;
   if (!jsonExtractString(json, "ssid", &ssid)) {
     Serial.println("[ERROR] missing ssid");
@@ -391,9 +409,14 @@ void handleWifiSave(const String& json) {
   } else {
     Serial.println("[ERROR] saved network list full");
   }
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handleWifiList() {
+void handleWifiList(Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   wifiPrefs.begin("foxwifi", true);
   int count = wifiPrefs.getInt("count", 0);
   for (int i = 0; i < count; i++) {
@@ -402,9 +425,14 @@ void handleWifiList() {
   }
   wifiPrefs.end();
   Serial.println("[WIFI/LIST/SUCCESS]");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handleWifiSavedList() {
+void handleWifiSavedList(Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   wifiPrefs.begin("foxwifi", true);
   int count = wifiPrefs.getInt("count", 0);
   for (int i = 0; i < count; i++) {
@@ -418,9 +446,14 @@ void handleWifiSavedList() {
   }
   wifiPrefs.end();
   Serial.println("[WIFI/SAVED/LIST/SUCCESS]");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handleWifiScan() {
+void handleWifiScan(Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   int found = WiFi.scanNetworks();
 
   String namesJson = "[";
@@ -441,9 +474,14 @@ void handleWifiScan() {
   Serial.flush();
   Serial.println();
   Serial.println("[GET/END]");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handleWifiAp(const String& json) {
+void handleWifiAp(const String& json, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String ssid, pass;
   if (!jsonExtractString(json, "ssid", &ssid)) {
     Serial.println("[ERROR] missing ssid");
@@ -458,6 +496,8 @@ void handleWifiAp(const String& json) {
   } else {
     Serial.println("[ERROR] failed to start AP");
   }
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 struct ChunkedRead {
@@ -550,7 +590,10 @@ int chunkedReadNext(ChunkedRead* cr, WiFiClient* stream, char* out, int maxLen) 
 }
 
 void doHttpRequest(const String& method, const String& url, const String& payload,
-                    const String& rawJson, const String& successTag) {
+                    const String& rawJson, const String& successTag, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (url.length() == 0) {
     Serial.println("[ERROR] missing url");
     return;
@@ -634,13 +677,18 @@ void doHttpRequest(const String& method, const String& url, const String& payloa
   else if (method == "DELETE") endTag = "[DELETE/END]";
   Serial.println(endTag);
   http.end();
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handlePlainGet(const String& url) {
-  doHttpRequest("GET", url, "", "", "[GET/SUCCESS]");
+void handlePlainGet(const String& url, Print& out) {
+  doHttpRequest("GET", url, "", "", "[GET/SUCCESS]", out);
 }
 
-void handleWifiIp() {
+void handleWifiIp(Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   HTTPClient http;
   http.setTimeout(HTTP_TIMEOUT_MS);
   WiFiClientSecure secureClient;
@@ -697,10 +745,15 @@ void handleWifiIp() {
   Serial.flush();
   Serial.println();
   Serial.println("[GET/END]");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 void doHttpRequestBytes(const String& method, const String& url, const String& payloadB64,
-                         const String& rawJson, const String& successTag) {
+                         const String& rawJson, const String& successTag, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (url.length() == 0) {
     Serial.println("[ERROR] missing url");
     return;
@@ -767,20 +820,25 @@ void doHttpRequestBytes(const String& method, const String& url, const String& p
   Serial.print(" ");
   Serial.println(base64::encode(buf, readLen));
   http.end();
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handleGetBytes(const String& url) {
-  doHttpRequestBytes("GET", url, "", "", "[GET/BYTES/SUCCESS]");
+void handleGetBytes(const String& url, Print& out) {
+  doHttpRequestBytes("GET", url, "", "", "[GET/BYTES/SUCCESS]", out);
 }
 
-void handlePostBytes(const String& json) {
+void handlePostBytes(const String& json, Print& out) {
   String url, payloadB64;
   jsonExtractString(json, "url", &url);
   jsonExtractString(json, "payload_b64", &payloadB64);
-  doHttpRequestBytes("POST", url, payloadB64, json, "[POST/BYTES/SUCCESS]");
+  doHttpRequestBytes("POST", url, payloadB64, json, "[POST/BYTES/SUCCESS]", out);
 }
 
-void handleParse(const String& json) {
+void handleParse(const String& json, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String source, key;
   if (!jsonExtractString(json, "json", &source) || !jsonExtractString(json, "key", &key)) {
     Serial.println("[ERROR] missing json/key");
@@ -792,8 +850,14 @@ void handleParse(const String& json) {
   } else {
     Serial.println("[ERROR] Key not found in JSON.");
   }
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
+// NOT SINK-REDIRECTED: SOCKET/START, SOCKET/STOP and SOCKET/SEND set up
+// and tear down the async wsClient relay above (wsEventHandler pushes its
+// received frames to Serial on its own schedule, independent of whoever
+// issued SOCKET/START) - there is no single request/reply to redirect.
 void handleSocketStart(const String& json) {
   String url;
   if (!jsonExtractString(json, "url", &url)) {
@@ -843,7 +907,10 @@ void handleSocketSend(const String& msg) {
   Serial.println("[SOCKET/SEND/SUCCESS]");
 }
 
-void handleParseArray(const String& json) {
+void handleParseArray(const String& json, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String source, idxStr;
   if (!jsonExtractString(json, "json", &source) || !jsonExtractString(json, "index", &idxStr)) {
     Serial.println("[ERROR] missing json/index");
@@ -855,6 +922,8 @@ void handleParseArray(const String& json) {
   } else {
     Serial.println("[ERROR] Key not found in JSON.");
   }
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 WiFiClientSecure dlSecureClient;
@@ -864,6 +933,13 @@ bool dlActive = false;
 int dlTotalSize = -1;
 int dlBytesRead = 0;
 
+// NOT SINK-REDIRECTED: DOWNLOAD/START, DOWNLOAD/STREAM, DOWNLOAD/CANCEL and
+// BAUD/SET below are one stateful UART-only feature - DOWNLOAD/STREAM
+// relays raw binary frames and polls Serial.available() live for a
+// [DOWNLOAD/CANCEL] line mid-transfer, and BAUD/SET changes the physical
+// UART's baud rate - neither has a meaningful HTTP/WS equivalent via a
+// Print& sink, so this whole cluster stays hardcoded to Serial and is not
+// reachable from the WiFi dispatch tables tasks #10/#11 build.
 void dlCleanup() {
   dlHttp.end();
   dlSecureClient.stop();
@@ -1132,7 +1208,10 @@ bool githubGetJsonHead(const String& url, String* outBody, int* outCode) {
 #define ASSET_STREAM_MAX 32
 #define ASSET_STREAM_HARD_CAP_MS 6000
 
-bool githubStreamAssets(const String& url, int* outCode, int* outCount) {
+bool githubStreamAssets(const String& url, int* outCode, int* outCount, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   HTTPClient http;
   WiFiClientSecure secureClient;
   secureClient.setInsecure();
@@ -1244,9 +1323,14 @@ bool githubStreamAssets(const String& url, int* outCode, int* outCount) {
 
   http.end();
   return true;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void handleReleaseCheck(const String& json) {
+void handleReleaseCheck(const String& json, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String repo;
   if (!jsonExtractString(json, "repo", &repo)) {
     Serial.println("[ERROR] missing repo");
@@ -1350,7 +1434,7 @@ void handleReleaseCheck(const String& json) {
         delay(attempt == 0 ? 50 : 300);
         assetsCode = 0;
         pageCount = 0;
-        pageOk = githubStreamAssets(pageUrl, &assetsCode, &pageCount) && assetsCode == 200;
+        pageOk = githubStreamAssets(pageUrl, &assetsCode, &pageCount, out) && assetsCode == 200;
       }
       if (!pageOk) {
         assetsOk = false;
@@ -1369,6 +1453,8 @@ void handleReleaseCheck(const String& json) {
   }
 
   Serial.println("[RELEASE/CHECK/END]");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
@@ -1382,7 +1468,10 @@ void loop() {
   if (wsActive) wsClient.loop();
 }
 
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!line.startsWith("[")) return false;
 
   int closeBracket = line.indexOf(']');
@@ -1429,16 +1518,16 @@ bool handleCommand(const String& line) {
     return true;
   }
 
-  if (cmd == "WIFI/SCAN") { handleWifiScan(); return true; }
-  if (cmd == "WIFI/SAVE") { handleWifiSave(rest); return true; }
-  if (cmd == "WIFI/CONNECT") { handleWifiConnect(rest); return true; }
+  if (cmd == "WIFI/SCAN") { handleWifiScan(out); return true; }
+  if (cmd == "WIFI/SAVE") { handleWifiSave(rest, out); return true; }
+  if (cmd == "WIFI/CONNECT") { handleWifiConnect(rest, out); return true; }
   if (cmd == "WIFI/DISCONNECT") {
     WiFi.disconnect();
     Serial.println("[DISCONNECTED] WiFi has been disconnected.");
     return true;
   }
-  if (cmd == "WIFI/FORGET") { handleWifiForget(rest); return true; }
-  if (cmd == "WIFI/LIST") { handleWifiList(); return true; }
+  if (cmd == "WIFI/FORGET") { handleWifiForget(rest, out); return true; }
+  if (cmd == "WIFI/LIST") { handleWifiList(out); return true; }
   if (cmd == "TZ/REFRESH") {
     if (WiFi.status() == WL_CONNECTED) {
       FoxTz::refreshOffset();
@@ -1448,7 +1537,7 @@ bool handleCommand(const String& line) {
     }
     return true;
   }
-  if (cmd == "WIFI/SAVED/LIST") { handleWifiSavedList(); return true; }
+  if (cmd == "WIFI/SAVED/LIST") { handleWifiSavedList(out); return true; }
 
   if (cmd == "WIFI/STATUS") {
     Serial.print("[WIFI/STATUS/SUCCESS]");
@@ -1465,7 +1554,7 @@ bool handleCommand(const String& line) {
 
   if (cmd == "WIFI/IP") {
     if (WiFi.status() != WL_CONNECTED) { Serial.println("[ERROR] not connected"); return true; }
-    handleWifiIp();
+    handleWifiIp(out);
     return true;
   }
 
@@ -1474,42 +1563,42 @@ bool handleCommand(const String& line) {
     return true;
   }
 
-  if (cmd == "WIFI/AP") { handleWifiAp(rest); return true; }
+  if (cmd == "WIFI/AP") { handleWifiAp(rest, out); return true; }
 
-  if (cmd == "GET") { handlePlainGet(rest); return true; }
-  if (cmd == "GET/BYTES") { handleGetBytes(rest); return true; }
-  if (cmd == "POST/BYTES") { handlePostBytes(rest); return true; }
+  if (cmd == "GET") { handlePlainGet(rest, out); return true; }
+  if (cmd == "GET/BYTES") { handleGetBytes(rest, out); return true; }
+  if (cmd == "POST/BYTES") { handlePostBytes(rest, out); return true; }
 
   if (cmd == "GET/HTTP") {
     String url; jsonExtractString(rest, "url", &url);
-    doHttpRequest("GET", url, "", rest, "[GET/SUCCESS]");
+    doHttpRequest("GET", url, "", rest, "[GET/SUCCESS]", out);
     return true;
   }
   if (cmd == "POST/HTTP") {
     String url, payload; jsonExtractString(rest, "url", &url); jsonExtractString(rest, "payload", &payload);
-    doHttpRequest("POST", url, payload, rest, "[POST/SUCCESS]");
+    doHttpRequest("POST", url, payload, rest, "[POST/SUCCESS]", out);
     return true;
   }
   if (cmd == "PUT/HTTP") {
     String url, payload; jsonExtractString(rest, "url", &url); jsonExtractString(rest, "payload", &payload);
-    doHttpRequest("PUT", url, payload, rest, "[PUT/SUCCESS]");
+    doHttpRequest("PUT", url, payload, rest, "[PUT/SUCCESS]", out);
     return true;
   }
   if (cmd == "PATCH/HTTP") {
     String url, payload; jsonExtractString(rest, "url", &url); jsonExtractString(rest, "payload", &payload);
-    doHttpRequest("PATCH", url, payload, rest, "[PATCH/SUCCESS]");
+    doHttpRequest("PATCH", url, payload, rest, "[PATCH/SUCCESS]", out);
     return true;
   }
   if (cmd == "DELETE/HTTP") {
     String url, payload; jsonExtractString(rest, "url", &url); jsonExtractString(rest, "payload", &payload);
-    doHttpRequest("DELETE", url, payload, rest, "[DELETE/SUCCESS]");
+    doHttpRequest("DELETE", url, payload, rest, "[DELETE/SUCCESS]", out);
     return true;
   }
 
-  if (cmd == "PARSE") { handleParse(rest); return true; }
-  if (cmd == "PARSE/ARRAY") { handleParseArray(rest); return true; }
+  if (cmd == "PARSE") { handleParse(rest, out); return true; }
+  if (cmd == "PARSE/ARRAY") { handleParseArray(rest, out); return true; }
 
-  if (cmd == "RELEASE/CHECK") { handleReleaseCheck(rest); return true; }
+  if (cmd == "RELEASE/CHECK") { handleReleaseCheck(rest, out); return true; }
   if (cmd == "DOWNLOAD/START") { handleDownloadStart(rest); return true; }
   if (cmd == "DOWNLOAD/STREAM") { handleDownloadStream(); return true; }
   if (cmd == "DOWNLOAD/CANCEL") { handleDownloadCancel(); return true; }
@@ -1522,7 +1611,20 @@ bool handleCommand(const String& line) {
   if (cmd == "LED/ON") { digitalWrite(STATUS_LED_PIN, HIGH); Serial.println("[LED/ON/SUCCESS]"); return true; }
   if (cmd == "LED/OFF") { digitalWrite(STATUS_LED_PIN, LOW); Serial.println("[LED/OFF/SUCCESS]"); return true; }
 
-  Serial.println("[ERROR] unknown command");
-  return true;
+  // Not one of ours - `line.startsWith("[")` above matches ANY bracketed
+  // command, not just this subsystem's, since there's no shared prefix
+  // (unlike "CSI/", "LAB/", etc.) to gate on up front. Returning false
+  // here (instead of printing an error and claiming it) lets
+  // FoxDispatch::handleCommand() keep trying the rest of the chain -
+  // every subsystem dispatched after this one (script engine, RFID,
+  // SubGHz, IR, GPS, portal, Discord, CSI, LAB) also uses the "[TAG/...]"
+  // bracket convention, so unconditionally claiming every bracketed line
+  // here silently ate all of their commands too, before they ever got a
+  // chance to run - this is what made FoxLAB's Start button (and likely
+  // several other subsystems' commands) look broken even though their
+  // own handlers were completely correct.
+  return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }

@@ -15,6 +15,9 @@
 #include "discord.h"
 #include "fox_csi.h"
 #include "gemini.h"
+#include "fox_lab.h"
+#include "fox_remote.h"
+#include "fox_dispatch.h"
 
 SET_LOOP_TASK_STACK_SIZE(32 * 1024);
 
@@ -30,46 +33,7 @@ void setup() {
   FoxHttp::begin();
   FoxScript::begin();
   FoxCsi::begin();
-}
-
-void handleCommand(const String& line) {
-  if (line == "AT") {
-    Serial.println("OK");
-    return;
-  }
-
-  if (line == "info") {
-    Serial.println("Fox ESP32 Firmware");
-    return;
-  }
-
-  if (line == "CAPS") {
-    Serial.print("HASBLE:");
-    Serial.println(FOX_HAS_BLE ? "1" : "0");
-    return;
-  }
-
-  if (FoxSettings::handleSettingsCommand(line)) return;
-  if (FoxBle::handleCommand(line)) return;
-  if (FoxBleAttack::handleCommand(line)) return;
-  if (FoxBleTags::handleCommand(line)) return;
-  if (FoxWifiRecon::handleCommand(line)) return;
-  if (FoxWifiAttack::handleCommand(line)) return;
-  if (FoxHttp::handleCommand(line)) return;
-  if (FoxScript::handleCommand(line)) return;
-  if (FoxRfid::handleCommand(line)) return;
-  if (FoxSubGhz::handleCommand(line)) return;
-  if (FoxIr::handleCommand(line)) return;
-  if (FoxGps::handleCommand(line)) return;
-  if (FoxPortal::handleCommand(line)) return;
-  if (FoxDiscord::handleCommand(line)) return;
-  if (FoxCsi::handleCommand(line)) return;
-  if (FoxGemini::handleCommand(line)) return;
-
-  if (line.length() > 0) {
-    Serial.print("ECHO:");
-    Serial.println(line);
-  }
+  FoxLab::begin();
 }
 
 void loop() {
@@ -79,12 +43,26 @@ void loop() {
   FoxPortal::loop();
   FoxGps::loop();
   FoxCsi::loop();
+  FoxLab::loop();
 
+  // A line starting with "[FLPR/" is a Fox Remote companion command reply
+  // or push (device/power/storage info, file browsing, screen frames,
+  // etc.) meant for every browser client currently attached to FoxLAB's
+  // relay WebSocket (fox_lab.cpp/fox_remote.h) - relay it there instead of
+  // through the normal AT-command dispatch chain. Everything else on this
+  // shared UART goes through FoxDispatch::handleCommand() exactly as
+  // before - unlike the old Expansion-Protocol-based RPC bridge this
+  // replaced, the Fox Remote relay never touches the UART's baud rate or
+  // framing, so this reader never has to step aside for it.
   while (Serial.available()) {
     char c = (char)Serial.read();
     if (c == '\n') {
       line.trim();
-      handleCommand(line);
+      if (line.startsWith("[FLPR/")) {
+        FoxRemote::forwardToClient(line);
+      } else {
+        FoxDispatch::handleCommand(line);
+      }
       line = "";
     } else if (c != '\r') {
       if ((int)line.length() < LINE_BUFFER_MAX) line += c;

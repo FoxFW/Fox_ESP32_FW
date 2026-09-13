@@ -132,7 +132,10 @@ size_t buildSaeCommitFrame(uint8_t* buf, const uint8_t srcMac[6], const uint8_t 
   return i;
 }
 
-void runSae() {
+void runSae(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t bssid[6]; uint8_t channel; String ssid;
   if (!FoxWifiRecon::getSelectedAp(bssid, &channel, &ssid)) {
     Serial.println("ERROR:NOAPSELECTED"); return;
@@ -147,9 +150,14 @@ void runSae() {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runQuietTime() {
+void runQuietTime(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t bssid[6]; uint8_t channel; String ssid;
   if (!FoxWifiRecon::getSelectedAp(bssid, &channel, &ssid)) {
     Serial.println("ERROR:NOAPSELECTED"); return;
@@ -167,6 +175,8 @@ void runQuietTime() {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 static char g_karmaSsids[BEACON_SPAM_SSID_MAX][BEACON_SPAM_SSID_LEN_MAX + 1];
@@ -196,9 +206,12 @@ void IRAM_ATTR karmaProbeCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
   g_karmaCount = n + 1;
 }
 
-void runBeaconSpamList(String* ssids, int count);
+void runBeaconSpamList(String* ssids, int count, Print& out = Serial);
 
-void runKarma() {
+void runKarma(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   g_karmaCount = 0;
   esp_wifi_set_promiscuous_rx_cb(&karmaProbeCallback);
   esp_wifi_set_promiscuous(true);
@@ -212,15 +225,25 @@ void runKarma() {
   if (n == 0) { Serial.println("ATTACKDONE"); return; }
   String ssids[BEACON_SPAM_SSID_MAX];
   for (int i = 0; i < n; i++) ssids[i] = String(g_karmaSsids[i]);
-  runBeaconSpamList(ssids, n);
+  runBeaconSpamList(ssids, n, out);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-bool refuseIfDisabled() {
+bool refuseIfDisabled(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!FoxSettings::attacksEnabled()) { Serial.println("ERROR:DISABLED"); return true; }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runDeauth(const uint8_t destMac[6]) {
+void runDeauth(const uint8_t destMac[6], Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t bssid[6]; uint8_t channel; String ssid;
   if (!FoxWifiRecon::getSelectedAp(bssid, &channel, &ssid)) {
     Serial.println("ERROR:NOAPSELECTED"); return;
@@ -234,9 +257,14 @@ void runDeauth(const uint8_t destMac[6]) {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runBeaconSpamList(String* ssids, int count) {
+void runBeaconSpamList(String* ssids, int count, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (count == 0) { Serial.println("ERROR:NOSSIDS"); return; }
   uint8_t frame[64 + BEACON_SPAM_SSID_LEN_MAX];
   uint8_t srcMac[6]; uint16_t seq = 0; int idx = 0;
@@ -249,9 +277,14 @@ void runBeaconSpamList(String* ssids, int count) {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runBeaconSpam(const String& ssidListRaw) {
+void runBeaconSpam(const String& ssidListRaw, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   String ssids[BEACON_SPAM_SSID_MAX];
   int count = 0;
   if (ssidListRaw.startsWith("RANDOM:")) {
@@ -270,10 +303,15 @@ void runBeaconSpam(const String& ssidListRaw) {
       rest = rest.substring(comma + 1);
     }
   }
-  runBeaconSpamList(ssids, count);
+  runBeaconSpamList(ssids, count, out);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runSleep() {
+void runSleep(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t bssid[6]; uint8_t channel; String ssid; uint8_t staMac[6];
   if (!FoxWifiRecon::getSelectedAp(bssid, &channel, &ssid)) {
     Serial.println("ERROR:NOAPSELECTED"); return;
@@ -290,9 +328,14 @@ void runSleep() {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runCsa() {
+void runCsa(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t bssid[6]; uint8_t channel; String ssid;
   if (!FoxWifiRecon::getSelectedAp(bssid, &channel, &ssid)) {
     Serial.println("ERROR:NOAPSELECTED"); return;
@@ -306,9 +349,14 @@ void runCsa() {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runBadPacket() {
+void runBadPacket(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t bssid[6]; uint8_t channel; String ssid;
   if (!FoxWifiRecon::getSelectedAp(bssid, &channel, &ssid)) {
     Serial.println("ERROR:NOAPSELECTED"); return;
@@ -322,16 +370,26 @@ void runBadPacket() {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runRickroll() {
+void runRickroll(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   int count = (int)(sizeof(RICKROLL_SSIDS) / sizeof(RICKROLL_SSIDS[0]));
   String ssids[count];
   for (int i = 0; i < count; i++) ssids[i] = String(RICKROLL_SSIDS[i]);
-  runBeaconSpamList(ssids, count);
+  runBeaconSpamList(ssids, count, out);
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-void runProbeFlood() {
+void runProbeFlood(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   uint8_t frame[64]; uint8_t srcMac[6]; uint16_t seq = 0;
   unsigned long start = millis();
   while (millis() - start < (unsigned long)ATTACK_BURST_SECONDS * 1000UL) {
@@ -341,9 +399,14 @@ void runProbeFlood() {
     delay(ATTACK_PACKET_INTERVAL_MS);
   }
   Serial.println("ATTACKDONE");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
-int runPortScan(const String& ip, int startPort, int endPort) {
+int runPortScan(const String& ip, int startPort, int endPort, Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   IPAddress target;
   if (!target.fromString(ip)) { Serial.println("ERROR:BADIP"); return -1; }
   if (startPort < 1) startPort = 1;
@@ -362,17 +425,22 @@ int runPortScan(const String& ip, int startPort, int endPort) {
   }
   Serial.println("PORTSCANDONE");
   return openCount;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
 namespace FoxWifiAttack {
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line == "WIFIATTACK:DEAUTH") {
-    if (refuseIfDisabled()) return true;
-    runDeauth(BROADCAST_MAC); return true;
+    if (refuseIfDisabled(out)) return true;
+    runDeauth(BROADCAST_MAC, out); return true;
   }
   if (line.startsWith("WIFIATTACK:DEAUTH:")) {
-    if (refuseIfDisabled()) return true;
+    if (refuseIfDisabled(out)) return true;
     String macStr = line.substring(19); macStr.trim();
     uint8_t mac[6]; unsigned int values[6];
     if (sscanf(macStr.c_str(), "%x:%x:%x:%x:%x:%x",
@@ -380,23 +448,23 @@ bool handleCommand(const String& line) {
       Serial.println("ERROR:BADMAC"); return true;
     }
     for (int i = 0; i < 6; i++) mac[i] = (uint8_t)values[i];
-    runDeauth(mac); return true;
+    runDeauth(mac, out); return true;
   }
   if (line.startsWith("WIFIATTACK:BEACON:")) {
-    if (refuseIfDisabled()) return true;
-    runBeaconSpam(line.substring(19)); return true;
+    if (refuseIfDisabled(out)) return true;
+    runBeaconSpam(line.substring(19), out); return true;
   }
-  if (line == "WIFIATTACK:PROBE") { if (refuseIfDisabled()) return true; runProbeFlood(); return true; }
-  if (line == "WIFIATTACK:RICKROLL") { if (refuseIfDisabled()) return true; runRickroll(); return true; }
-  if (line == "WIFIATTACK:BADPACKET") { if (refuseIfDisabled()) return true; runBadPacket(); return true; }
-  if (line == "WIFIATTACK:CSA") { if (refuseIfDisabled()) return true; runCsa(); return true; }
-  if (line == "WIFIATTACK:SLEEP") { if (refuseIfDisabled()) return true; runSleep(); return true; }
-  if (line == "WIFIATTACK:SAE") { if (refuseIfDisabled()) return true; runSae(); return true; }
-  if (line == "WIFIATTACK:QUIET") { if (refuseIfDisabled()) return true; runQuietTime(); return true; }
-  if (line == "WIFIATTACK:KARMA") { if (refuseIfDisabled()) return true; runKarma(); return true; }
+  if (line == "WIFIATTACK:PROBE") { if (refuseIfDisabled(out)) return true; runProbeFlood(out); return true; }
+  if (line == "WIFIATTACK:RICKROLL") { if (refuseIfDisabled(out)) return true; runRickroll(out); return true; }
+  if (line == "WIFIATTACK:BADPACKET") { if (refuseIfDisabled(out)) return true; runBadPacket(out); return true; }
+  if (line == "WIFIATTACK:CSA") { if (refuseIfDisabled(out)) return true; runCsa(out); return true; }
+  if (line == "WIFIATTACK:SLEEP") { if (refuseIfDisabled(out)) return true; runSleep(out); return true; }
+  if (line == "WIFIATTACK:SAE") { if (refuseIfDisabled(out)) return true; runSae(out); return true; }
+  if (line == "WIFIATTACK:QUIET") { if (refuseIfDisabled(out)) return true; runQuietTime(out); return true; }
+  if (line == "WIFIATTACK:KARMA") { if (refuseIfDisabled(out)) return true; runKarma(out); return true; }
 
   if (line.startsWith("WIFIPORTSCAN:")) {
-    if (refuseIfDisabled()) return true;
+    if (refuseIfDisabled(out)) return true;
     String rest = line.substring(strlen("WIFIPORTSCAN:"));
     int c1 = rest.indexOf(':');
     int c2 = (c1 < 0) ? -1 : rest.indexOf(':', c1 + 1);
@@ -404,11 +472,13 @@ bool handleCommand(const String& line) {
     String ip = rest.substring(0, c1);
     int startPort = rest.substring(c1 + 1, c2).toInt();
     int endPort = rest.substring(c2 + 1).toInt();
-    runPortScan(ip, startPort, endPort);
+    runPortScan(ip, startPort, endPort, out);
     return true;
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 bool scriptDeauth() {

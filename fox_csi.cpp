@@ -1,5 +1,6 @@
 #include "fox_csi.h"
 #include "config.h"
+#include "fox_lab.h"
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -271,6 +272,11 @@ void vitalsUpdate(float* amp, int nSub) {
   vitalsFrameCount = 0;
 }
 
+// NOT SINK-REDIRECTED: wifiCsiCb/surveyPromiscCb are IRAM_ATTR WiFi driver
+// RX callbacks - async, decoupled from any single handleCommand() call's
+// chain, same category as wifi_recon.cpp's promiscuousCallback(). Neither
+// touches Serial directly; they only set the volatile *Pending flags that
+// FoxCsi::loop() below picks up and reports.
 void IRAM_ATTR wifiCsiCb(void* ctx, wifi_csi_info_t* info) {
   (void)ctx;
   if (!info || !info->buf) return;
@@ -653,7 +659,6 @@ void begin() {
   prefs.begin("foxcsi", false);
   meshRole = (prefs.getUChar("role", 0) == 1) ? MeshRoleSecondary : MeshRolePrimary;
   pathlossGamma = (float)prefs.getUChar("gamma_x10", 20) / 10.0f;
-  bool wantWebUi = prefs.getBool("webui", false);
 
   if (prefs.isKey("positions")) {
     int16_t buf[6];
@@ -672,11 +677,21 @@ void begin() {
 
   started = true;
 
-  if (meshRole == MeshRolePrimary && wantWebUi) {
-    webUiStart();
-  }
+  // The web UI (and its FoxCSI AP) is deliberately NOT auto-resumed here -
+  // a reboot always comes back to "off, waiting for a command", it never
+  // restarts on its own from whatever was on before power was lost.
 }
 
+// NOT SINK-REDIRECTED: loop()'s event reports (MOTION/WATERFALL/VITALS/
+// CHANNEL/SET/NODE_FOUND/MESH, including CSI/CHANNEL/AUTO's actual result -
+// runChannelSurvey() just sets channelResultPending, the "[CSI/CHANNEL/SET]"
+// line is printed here) are periodic pushes tied to the main loop tick, not
+// replies within any single handleCommand() call's chain - the same
+// decoupled-async category as an event-driven callback, just polled instead
+// of interrupt-driven. They're already dual-published to wsBroadcast() for
+// the existing CSI web UI's WebSocket (port 81); the esp32-tab's own
+// streaming channel (task #11) should tap the same *Pending flags/events
+// rather than trying to route these through handleCommand()'s `out`.
 void loop() {
   if (!started) return;
 
@@ -775,7 +790,14 @@ void loop() {
   }
 }
 
-bool handleCommand(const String& line) {
+bool isWebUiActive() {
+  return webUiActive;
+}
+
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (!line.startsWith("[CSI/")) return false;
   int closeBracket = line.indexOf(']');
   if (closeBracket < 0) return false;
@@ -937,9 +959,17 @@ bool handleCommand(const String& line) {
   }
 
   if (cmd == "CSI/WEBUI/ON") {
+    // Task #13: the ESP32 can only run one softAP SSID and bind port 80
+    // once - starting CSI's web UI while FoxLAB's own (AP "FoxLAB") is up
+    // would silently rename the AP out from under any already-connected
+    // FoxLAB browser client and likely fail CSI's own port-80 bind too.
+    // Refuse cleanly instead of leaving both in a broken half-started state.
+    if (FoxLab::isActive()) {
+      Serial.println("[CSI/WEBUI/ON/ERROR]LABACTIVE");
+      return true;
+    }
     if (meshRole == MeshRolePrimary) {
       webUiStart();
-      prefs.putBool("webui", true);
     }
     Serial.println("[CSI/WEBUI/ON/SUCCESS]");
     return true;
@@ -947,12 +977,13 @@ bool handleCommand(const String& line) {
 
   if (cmd == "CSI/WEBUI/OFF") {
     webUiStop();
-    prefs.putBool("webui", false);
     Serial.println("[CSI/WEBUI/OFF/SUCCESS]");
     return true;
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 
 }

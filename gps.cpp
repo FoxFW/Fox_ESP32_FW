@@ -125,12 +125,17 @@ void pump() {
   }
 }
 
-void doInit() {
+void doInit(Print& out = Serial) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   gpsSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
   gpsInitialized = true;
   hasFix = false;
   nmeaLen = 0;
   Serial.println("OK");
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
@@ -146,9 +151,12 @@ bool getFix(double* latOut, double* lonOut) {
   return true;
 }
 
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   if (line == "GPSINIT") {
-    doInit();
+    doInit(out);
     return true;
   }
 
@@ -262,6 +270,8 @@ bool handleCommand(const String& line) {
   }
 
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
@@ -276,7 +286,10 @@ bool getFix(double* latOut, double* lonOut) {
   return false;
 }
 
-bool handleCommand(const String& line) {
+bool handleCommand(const String& line, Print& out) {
+#pragma push_macro("Serial")
+#undef Serial
+#define Serial out
   static const char* prefixes[] = {
     "GPSINIT", "GPS:FIX", "GPS:SAT", "GPS:LAT", "GPS:LON", "GPS:ALT", "GPS:DATE",
     "GPSTRACK", "GPSPOI:START", "GPSPOI:MARK", "GPSPOI:END"
@@ -288,6 +301,8 @@ bool handleCommand(const String& line) {
     }
   }
   return false;
+#undef Serial
+#pragma pop_macro("Serial")
 }
 }
 
