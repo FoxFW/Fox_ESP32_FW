@@ -1,4 +1,5 @@
 #include "config.h"
+#include "fox_psram.h"
 #include "settings.h"
 #include "ble_bridge.h"
 #include "ble_attack.h"
@@ -27,6 +28,11 @@ void setup() {
   delay(200);
   Serial.println();
   Serial.println("Fox ESP32 Firmware v" FOX_FIRMWARE_VERSION " booted on UART0 (GPIO1/GPIO3)");
+
+  // Must run first, before anything below opens a TLS connection
+  // (Discord/Gemini) or allocates a PSRAM-backed table (FoxScript) - see
+  // fox_psram.h/claude/S2_RAM_OOM_ANALYSIS.md.
+  FoxPsram::begin();
 
   FoxSettings::begin();
   FoxWifiRecon::begin();

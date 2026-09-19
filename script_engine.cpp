@@ -5,6 +5,7 @@
 #include "wifi_attack.h"
 #include "wifi_recon.h"
 #include "settings.h"
+#include "fox_psram.h"
 
 #include <LittleFS.h>
 #include <Preferences.h>
@@ -14,6 +15,7 @@
 #include <math.h>
 #include <ctype.h>
 #include <string.h>
+#include <new>
 
 namespace {
 enum class VT { UNDEF, NUM, STR, BOOL, ARRAY, OBJECT };
@@ -271,8 +273,48 @@ struct ObjectSlot {
   int count = 0;
 };
 
-ArraySlot g_arrays[SCRIPT_ARRAYS_MAX];
-ObjectSlot g_objects[SCRIPT_OBJECTS_MAX];
+// S2 RAM/OOM investigation (2026-09-14, see claude/S2_RAM_OOM_ANALYSIS.md):
+// these three tables (g_arrays/g_objects below, g_tokens further down) are
+// the only static RAM FoxScript reserves at boot regardless of whether
+// scripting is ever used - ~42.9KB at classic's full size, ~16.5KB at S2's
+// already-shrunk size (see config.h). They're now pointers, allocated once
+// by allocScriptTables() (called from FoxScript::begin(), below) via
+// FoxPsram::alloc()-equivalent logic, preferring PSRAM when real PSRAM was
+// found at boot and falling back to the exact same internal RAM every
+// board already used otherwise - so a board without PSRAM sees no change
+// at all. SCRIPT_ARRAYS_MAX/SCRIPT_OBJECTS_MAX/SCRIPT_TOKENS_MAX (and
+// S2's smaller values specifically) are deliberately NOT being raised back
+// up as part of this change even though PSRAM removes the RAM pressure
+// that motivated shrinking them for S2 in the first place - the fallback
+// path (no PSRAM present) still has to fit these tables in internal RAM at
+// whatever size is configured, so raising S2's limits now would silently
+// reintroduce the original problem on any S2 board without real PSRAM.
+// Revisiting those limits is a separate, deliberate decision for later,
+// not a side effect of this change.
+ArraySlot* g_arrays = nullptr;
+ObjectSlot* g_objects = nullptr;
+
+// Allocates and placement-constructs g_arrays/g_objects (and, further
+// below, g_tokens) exactly once. Each element is placement-constructed
+// individually - not via `new[]` - because ArraySlot/ObjectSlot/Token all
+// contain Arduino String members, which MUST have their constructor run
+// before any use; raw or zeroed memory is not a valid String (its internal
+// pointer/length/capacity fields would be garbage). This mirrors what the
+// old plain global-array declarations already got for free from static
+// initialization - this function exists purely to do the same
+// construction on PSRAM-or-internal heap memory instead of in .bss.
+void allocScriptTables() {
+  void* arraysMem = FoxPsram::alloc(sizeof(ArraySlot) * SCRIPT_ARRAYS_MAX);
+  void* objectsMem = FoxPsram::alloc(sizeof(ObjectSlot) * SCRIPT_OBJECTS_MAX);
+  g_arrays = static_cast<ArraySlot*>(arraysMem);
+  g_objects = static_cast<ObjectSlot*>(objectsMem);
+  if (!g_arrays || !g_objects) {
+    Serial.println("ERROR:SCRIPT_ALLOC_FAILED");
+    return;
+  }
+  for (int i = 0; i < SCRIPT_ARRAYS_MAX; i++) new (&g_arrays[i]) ArraySlot();
+  for (int i = 0; i < SCRIPT_OBJECTS_MAX; i++) new (&g_objects[i]) ObjectSlot();
+}
 
 void resetArraysAndObjects() {
   for (int i = 0; i < SCRIPT_ARRAYS_MAX; i++) { g_arrays[i].used = false; g_arrays[i].count = 0; }
@@ -1095,7 +1137,19 @@ public:
   }
 };
 
-Token g_tokens[SCRIPT_TOKENS_MAX];
+// See allocScriptTables() above - same PSRAM-or-internal-RAM pattern and
+// same placement-new requirement (Token contains a String member).
+Token* g_tokens = nullptr;
+
+void allocTokenTable() {
+  void* tokensMem = FoxPsram::alloc(sizeof(Token) * SCRIPT_TOKENS_MAX);
+  g_tokens = static_cast<Token*>(tokensMem);
+  if (!g_tokens) {
+    Serial.println("ERROR:SCRIPT_ALLOC_FAILED");
+    return;
+  }
+  for (int i = 0; i < SCRIPT_TOKENS_MAX; i++) new (&g_tokens[i]) Token();
+}
 
 bool sanitizeName(const String& raw, String* out) {
   if (raw.length() == 0 || raw.length() > SCRIPT_NAME_MAX) return false;
@@ -1209,6 +1263,8 @@ void cmdRun(const String& rawName, Print& out = Serial) {
 
 namespace FoxScript {
 void begin() {
+  allocScriptTables();
+  allocTokenTable();
   LittleFS.begin(true);
 }
 

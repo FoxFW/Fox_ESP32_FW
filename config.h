@@ -12,6 +12,62 @@
 #define FOX_BLE_NIMBLE 0
 #endif
 
+// S2 RAM/OOM investigation (2026-09-14, see claude/S2_RAM_OOM_ANALYSIS.md):
+// per-board matrix for whether Fox's own code (mbedTLS's allocator,
+// FoxScript's g_tokens/g_arrays/g_objects, http_bridge's request/stream
+// buffers - all routed through FoxPsram, fox_psram.h/.cpp) is allowed to
+// call any PSRAM API at all:
+//
+//   Classic  NO   - real linker map showed classic's IRAM0 is already
+//                   ~98% consumed by the full dual-mode BTDM/Bluedroid
+//                   Bluetooth stack (libbtdm_app.a alone ~33KB of the
+//                   128KB budget - classic is the only board where
+//                   FOX_HAS_BLE=1 AND FOX_BLE_NIMBLE=0). Simply
+//                   REFERENCING any PSRAM API anywhere in the firmware -
+//                   not even calling it, just linking it - pulls in
+//                   ~3.7KB of libesp_psram.a's IRAM-resident code and
+//                   overflows classic's IRAM0 by itself. Classic also
+//                   doesn't need the fix - real `DISCORDHEAP:` data
+//                   already shows it comfortably fits its DRAM budget.
+//   S2       YES  - the board that started this whole investigation;
+//                   the fix works today and is the one board that
+//                   actually needs it.
+//   S3       NO   - not an IRAM problem like classic (S3 uses the much
+//                   smaller NimBLE stack, confirmed no IRAM pressure).
+//                   Excluded instead because S3's PSRAM comes in two
+//                   incompatible bus widths (QSPI vs OPI) that must
+//                   match the physical module or risk a hard boot hang
+//                   (PSRAM bus training happens before any application
+//                   code runs, so this can't fail safe the way a simple
+//                   Enabled/Disabled mismatch does elsewhere). Checked
+//                   Marauder's own real-hardware CI build matrix
+//                   (build_parallel.yml) as a reference: every S3 board
+//                   they actually ship (Flipper Zero Multi Board S3,
+//                   M5Cardputer, M5Cardputer ADV) builds with PSRAM
+//                   disabled - matching this choice.
+//   C3       NO   - no PSRAM in silicon at all (no SOC_SPIRAM_SUPPORTED,
+//                   no Tools->PSRAM menu entry - confirmed from
+//                   ESP-IDF's soc_caps.h and arduino-esp32's boards.txt).
+//   C5       YES  - has real PSRAM support in silicon, and Marauder's
+//                   own shipped C5 hardware (including their Pancake
+//                   board) builds with PSRAM=enabled - a plain
+//                   Enabled/Disabled toggle on C5, not a QSPI/OPI split
+//                   like S3, so none of S3's bus-mismatch risk applies.
+//   C6       NO   - same as C3, no PSRAM in silicon at all.
+//
+// Whichever boards are gated NO here still need the Arduino IDE's own
+// Tools -> PSRAM board menu left on Disabled too - that's a separate,
+// board-package-level setting outside this file's control (confirmed on
+// classic: this macro alone couldn't remove libesp_psram.a from the
+// link, because the Arduino core's own esp32-hal-psram.c calls
+// esp_psram_init() unconditionally whenever the board menu has PSRAM
+// enabled, regardless of what application code does or doesn't call).
+#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C5)
+#define FOX_HAS_PSRAM_SUPPORT 1
+#else
+#define FOX_HAS_PSRAM_SUPPORT 0
+#endif
+
 #define FOX_HAS_RFID 0
 #define FOX_HAS_SUBGHZ 0
 #define FOX_HAS_IR 0
@@ -46,7 +102,7 @@
 // to keep recon/attack range from taking too much of a hit.
 #define FOX_WIFI_TX_POWER WIFI_POWER_15dBm
 
-#define FOX_FIRMWARE_VERSION "1.3.0"
+#define FOX_FIRMWARE_VERSION "1.4.0"
 
 #define BLE_SCAN_SECONDS 5
 
@@ -102,6 +158,26 @@
 #define DISCORD_CONTENT_PREVIEW_MAX 100
 #define DISCORD_POST_MIN_INTERVAL_MS 3000
 
+// S2 RAM/OOM investigation (2026-09-13, see claude/S2_RAM_OOM_ANALYSIS.md
+// project doc): tried WiFiClientSecure::setBufferSizes() to shrink the
+// mbedTLS RX/TX buffers, since a single DISCORDREAD's own trough cost
+// measured a rock-solid ~54KB independent of response body size. Confirmed
+// by a real compile error that this installed arduino-esp32 core has
+// removed setBufferSizes() from the renamed NetworkClientSecure - reverted
+// (see discord.cpp). Not worth retrying unless the board package is
+// upgraded to a core that still exposes it.
+//
+// UPDATE (2026-09-14): the real fix landed instead - see fox_psram.h/.cpp.
+// mbedTLS's ~32KB fixed RX/TX buffers, FoxScript's g_tokens/g_arrays/
+// g_objects tables, and http_bridge's two static HTTP/download buffers are
+// now all routed through FoxPsram, which moves them onto PSRAM on any
+// board where real PSRAM is found at boot (classic/S2/S3/C5 all have
+// PSRAM support in silicon per arduino-esp32's boards.txt and ESP-IDF's
+// soc_caps.h SOC_SPIRAM_SUPPORTED - confirmed directly, not assumed; C3/C6
+// have none at all) and falls back to the exact same internal RAM every
+// board already used otherwise. No PlatformIO, no core changes - see
+// claude/S2_RAM_OOM_ANALYSIS.md for the full research trail.
+
 #define FOXCHAT_RELAY_BASE_URL "https://foxfw-chat-relay.foxcustomfirmware.workers.dev"
 #define FOXCHAT_RELAY_APP_KEY  "foxfw-esp32-chat-v1"
 
@@ -125,6 +201,17 @@
 // headroom over a realistic multi-step automation script (measured ~150
 // tokens for a WiFi-connect + heap-check + GPIO + HTTP loop) while still
 // freeing a meaningful chunk of that 42KB on S2 only.
+//
+// UPDATE (2026-09-14): as of fox_psram.h/script_engine.cpp's
+// allocScriptTables(), these three tables live in PSRAM instead of
+// internal RAM when real PSRAM is found at boot - see the note above this
+// block. The S2-specific limits below are deliberately UNCHANGED by that:
+// a board reporting no PSRAM at boot (a non-WROVER-class S2 module, or any
+// board with the Tools -> PSRAM menu left Disabled) still allocates these
+// same tables out of internal RAM as a fallback, so the limits still have
+// to fit there. Raising S2's limits to match classic's is a separate,
+// deliberate decision for later (once real PSRAM-equipped S2 hardware has
+// been confirmed stable), not a side effect of the PSRAM change.
 #if defined(CONFIG_IDF_TARGET_ESP32S2)
 #define SCRIPT_SOURCE_MAX 2048
 #define SCRIPT_TOKENS_MAX 256

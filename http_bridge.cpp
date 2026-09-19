@@ -1,6 +1,7 @@
 #include "http_bridge.h"
 #include "config.h"
 #include "tz.h"
+#include "fox_psram.h"
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -798,7 +799,21 @@ void doHttpRequestBytes(const String& method, const String& url, const String& p
     return;
   }
 
-  static uint8_t buf[HTTP_BYTES_MAX];
+  // S2 RAM/OOM investigation (2026-09-14, see claude/S2_RAM_OOM_ANALYSIS.md):
+  // was `static uint8_t buf[HTTP_BYTES_MAX]` - a fixed ~3KB of static RAM
+  // reserved on every board at boot regardless of whether this command is
+  // ever used. Now a lazily-allocated, PSRAM-preferring pointer: nothing is
+  // reserved until the first GET/BYTES or POST/BYTES call, and on a board
+  // with real PSRAM it lives there instead of internal RAM at all. Falls
+  // back to internal RAM automatically on a board without PSRAM - same
+  // memory this buffer always used before.
+  static uint8_t* buf = nullptr;
+  if (!buf) buf = static_cast<uint8_t*>(FoxPsram::alloc(HTTP_BYTES_MAX));
+  if (!buf) {
+    Serial.println("ERROR:ALLOC");
+    http.end();
+    return;
+  }
   WiFiClient* stream = http.getStreamPtr();
   int totalLen = http.getSize();
   int toRead = (totalLen > 0) ? min(totalLen, HTTP_BYTES_MAX) : HTTP_BYTES_MAX;
@@ -1042,9 +1057,21 @@ void handleDownloadStream() {
     return;
   }
 
+  // Same PSRAM-preferring/lazy pattern as HTTP_BYTES_MAX's buffer above -
+  // was `static uint8_t buf[DOWNLOAD_STREAM_FRAME]` (~1KB static RAM on
+  // every board at boot regardless of use). Checked before printing BEGIN
+  // so a (practically never expected) alloc failure doesn't leave the
+  // receiving client waiting on a stream that was announced but never
+  // starts.
+  static uint8_t* buf = nullptr;
+  if (!buf) buf = static_cast<uint8_t*>(FoxPsram::alloc(DOWNLOAD_STREAM_FRAME));
+  if (!buf) {
+    Serial.println("[ERROR] alloc failed");
+    return;
+  }
+
   Serial.println("[DOWNLOAD/STREAM/BEGIN]");
 
-  static uint8_t buf[DOWNLOAD_STREAM_FRAME];
   WiFiClient* stream = dlHttp.getStreamPtr();
   bool cancelled = false;
   bool errored = false;
@@ -1068,7 +1095,7 @@ void handleDownloadStream() {
       }
     }
 
-    size_t want = sizeof(buf);
+    size_t want = DOWNLOAD_STREAM_FRAME;
     if (!cr.chunked && dlTotalSize >= 0) {
       int remaining = dlTotalSize - dlBytesRead;
       if ((int)want > remaining) want = remaining;
